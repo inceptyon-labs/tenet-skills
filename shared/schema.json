@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tenet Health Report",
+  "description": "Schema for a complete Tenet audit report uploaded to the dashboard.",
+  "type": "object",
+  "required": ["project", "run", "dimensions", "findings"],
+  "properties": {
+    "project": {
+      "type": "object",
+      "required": ["slug", "name", "commit", "branch"],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Lowercase-kebab, derived from repo directory name"
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable project name"
+        },
+        "repo_url": {
+          "type": ["string", "null"],
+          "description": "Git remote origin URL if present"
+        },
+        "commit": {
+          "type": "string",
+          "description": "Current HEAD short SHA"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Current git branch"
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "required": ["started_at", "completed_at", "orchestrator_version", "dimensions_run"],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 UTC timestamp when the run started"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 UTC timestamp when the run completed"
+        },
+        "orchestrator_version": {
+          "type": "string",
+          "description": "Semantic version of the orchestrator skill"
+        },
+        "dimensions_run": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of dimension keys that were executed"
+        },
+        "toolchain_summary": {
+          "type": "object",
+          "description": "Summary of which deterministic tools ran and their status",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "ran": { "type": "boolean" },
+              "version": { "type": ["string", "null"] },
+              "duration_ms": { "type": ["integer", "null"] },
+              "finding_count": { "type": ["integer", "null"] },
+              "mode": {
+                "type": "string",
+                "enum": ["required", "auto", "off", "missing"]
+              }
+            }
+          }
+        }
+      }
+    },
+    "dimensions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["key", "score", "weight", "skill_version", "notes", "applicable"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Dimension identifier (e.g., 'security', 'complexity')"
+          },
+          "score": {
+            "type": ["integer", "null"],
+            "minimum": 0,
+            "maximum": 100,
+            "description": "0-100 integer score, null if not applicable"
+          },
+          "weight": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 3.0,
+            "description": "Weight multiplier for composite scoring"
+          },
+          "skill_version": {
+            "type": "string",
+            "description": "Version of the skill that produced this score"
+          },
+          "notes": {
+            "type": "string",
+            "description": "One paragraph summary of what was examined and headline finding"
+          },
+          "applicable": {
+            "type": "boolean",
+            "description": "Whether this dimension applies to the project"
+          },
+          "metrics": {
+            "type": "object",
+            "description": "Dimension-specific key-value metrics",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dimension", "severity", "title", "description", "fix_prompt"],
+        "properties": {
+          "dimension": {
+            "type": "string",
+            "description": "Which dimension this finding belongs to"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "major", "minor", "info"],
+            "description": "Finding severity level"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "One-line problem statement"
+          },
+          "description": {
+            "type": "string",
+            "description": "2-4 sentence explanation of what and why it matters"
+          },
+          "file": {
+            "type": ["string", "null"],
+            "description": "Relative path from repo root"
+          },
+          "line": {
+            "type": ["integer", "null"],
+            "description": "Line number of the finding"
+          },
+          "snippet": {
+            "type": ["string", "null"],
+            "maxLength": 500,
+            "description": "Offending code snippet"
+          },
+          "fix_prompt": {
+            "type": "string",
+            "description": "Self-contained prompt for Claude Code to fix this finding"
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["deterministic", "native", "tree_sitter", "heuristic"],
+            "description": "Confidence tier of the detection method"
+          }
+        }
+      }
+    }
+  }
+}

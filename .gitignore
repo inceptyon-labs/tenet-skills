@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.healthcheck/
+*.log
+.DS_Store
+
+# Ephemeral eval outputs — may contain real credentials from scanned projects
+tenet-skills-workspace/
