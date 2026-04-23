@@ -5,9 +5,6 @@
   "author": {
     "name": "Tenet"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/inceptyon-labs/tenet-skills"
-  },
+  "repository": "https://github.com/inceptyon-labs/tenet-skills",
   "license": "MIT"
 }
