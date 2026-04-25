@@ -1,6 +1,6 @@
 ---
 name: tenet-observability
-description: "Evaluates observability posture: structured logging presence, log level appropriateness, correlation IDs and trace propagation, metrics on critical paths, health check endpoints, and graceful shutdown handling."
+description: "Audits logging, trace/correlation IDs, metrics, health checks, and shutdown handling."
 when_to_use: "Observability audit, logging review, metrics check, health endpoint, tracing, tenet observability"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

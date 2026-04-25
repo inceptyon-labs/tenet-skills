@@ -1,6 +1,6 @@
 ---
 name: tenet-performance
-description: "Identifies performance anti-patterns: N+1 query patterns, synchronous I/O in hot paths, missing indexes, unbounded queries, memory leaks, bundle size issues, and React re-render hazards."
+description: "Audits performance risks: N+1 queries, sync I/O, indexes, leaks, bundles, and rerenders."
 when_to_use: "Performance audit, N+1 queries, memory leaks, bundle size, React performance, tenet performance"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

@@ -1,6 +1,6 @@
 ---
 name: tenet-api-contract
-description: "Evaluates API design consistency: response shape uniformity, error response schemas, RESTful verb usage, versioning strategy, idempotency on PUT/DELETE, proper status codes, and pagination consistency. Applicable when API route handlers, OpenAPI/GraphQL schemas, or tRPC routers are detected."
+description: "Audits API consistency: schemas, errors, status codes, pagination, versioning, and idempotency."
 when_to_use: "API audit, REST consistency, OpenAPI check, GraphQL review, tRPC review, tenet api-contract"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

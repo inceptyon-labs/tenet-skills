@@ -1,6 +1,6 @@
 ---
 name: tenet-toolchain-setup
-description: "First-run concierge for Tenet. Scans the host for installed static-analysis tools, analyzes the project to determine which tools are needed, shows a gap report, and generates a .healthcheck.toml config. Use when setting up Tenet for the first time on a machine or in a project, or when refreshing the toolchain config."
+description: "Sets up Tenet static-analysis tools and generates .healthcheck.toml for a project."
 when_to_use: "First time running Tenet, setting up healthcheck, refreshing toolchain config, tenet setup, tenet init, tenet-orchestrator --setup"
 disable-model-invocation: true
 model: sonnet

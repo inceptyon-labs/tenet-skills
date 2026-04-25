@@ -1,6 +1,6 @@
 ---
 name: tenet-toolchain
-description: "Deterministic pre-pass that runs all available static analysis tools and writes normalized JSON output to .healthcheck/toolchain/. Called by the orchestrator before any specialist skill. Do not invoke directly unless debugging the toolchain layer."
+description: "Runs Tenet static-analysis tools and writes normalized outputs for audit skills."
 when_to_use: "Called by tenet-orchestrator automatically. Can be invoked directly to re-run the deterministic toolchain layer without running specialist skills."
 user-invocable: false
 model: sonnet

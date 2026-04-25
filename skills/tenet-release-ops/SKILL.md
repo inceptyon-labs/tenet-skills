@@ -1,6 +1,6 @@
 ---
 name: tenet-release-ops
-description: "Audits release and operational readiness: deploy strategy, rollback path, feature flags, environment config drift, release notes, versioning, incident runbooks, SLO/error-budget signals, and production smoke checks."
+description: "Audits release readiness, rollback, feature flags, env drift, runbooks, SLOs, and smoke checks."
 when_to_use: "Release audit, deployment readiness, rollback plan, feature flags, runbook review, production smoke tests, tenet release-ops"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

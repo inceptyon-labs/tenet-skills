@@ -1,6 +1,6 @@
 ---
 name: tenet-security
-description: "Audits the codebase for security vulnerabilities: injection risks (SQL, command, XSS), auth/authz gaps, insecure defaults, unsafe deserialization, missing input validation, open redirects, CSRF, CORS misconfiguration, unsafe crypto, and SSRF. Called by the orchestrator or directly."
+description: "Audits security vulnerabilities including injection, auth, validation, crypto, SSRF, CORS, and CSRF."
 when_to_use: "Security audit, vulnerability scan, injection check, auth review, OWASP check, tenet security"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

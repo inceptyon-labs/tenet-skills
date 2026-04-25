@@ -1,6 +1,6 @@
 ---
 name: tenet-errors
-description: "Audits error handling quality: empty catch blocks, catch-and-ignore, overly broad catches, unhandled Promise rejections, error swallowing in async iteration, inconsistent error types, missing error boundaries in React, and missing timeout handling on network calls."
+description: "Audits error handling: empty catches, swallowed async errors, inconsistent types, and missing timeouts."
 when_to_use: "Error handling audit, catch block review, unhandled rejection, error boundaries, tenet errors"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

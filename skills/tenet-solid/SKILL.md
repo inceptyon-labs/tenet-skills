@@ -1,6 +1,6 @@
 ---
 name: tenet-solid
-description: "Evaluates adherence to SOLID design principles: Single Responsibility (classes doing multiple things), Open/Closed (switch/if-else on type), Liskov Substitution (contract-breaking overrides), Interface Segregation (fat interfaces), and Dependency Inversion (concrete infrastructure in domain logic)."
+description: "Audits SOLID design risks: responsibility, substitution, interfaces, dependency direction."
 when_to_use: "SOLID audit, design principles, SRP, OCP, LSP, ISP, DIP, architecture review, tenet solid"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

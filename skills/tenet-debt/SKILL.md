@@ -1,6 +1,6 @@
 ---
 name: tenet-debt
-description: "Identifies technical debt: TODO/FIXME/HACK/XXX comments aged over 90 days, commented-out code blocks, deprecated API usage, stub implementations, and long-lived temporary feature flags."
+description: "Audits TODO/FIXME debt, commented code, deprecated APIs, stubs, and temporary flags."
 when_to_use: "Tech debt audit, TODO scan, deprecated code, dead code, tenet debt"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

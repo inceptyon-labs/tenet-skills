@@ -1,6 +1,6 @@
 ---
 name: tenet-privacy-data
-description: "Audits privacy and data-handling risk: PII collection, logging/redaction, retention controls, data export/delete flows, consent boundaries, and sensitive data exposure in analytics or third-party integrations."
+description: "Audits PII handling, consent, retention, deletion/export flows, redaction, and analytics exposure."
 when_to_use: "Privacy audit, PII scan, data retention, GDPR/CCPA readiness, sensitive data logging, tenet privacy-data"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

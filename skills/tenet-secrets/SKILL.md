@@ -1,6 +1,6 @@
 ---
 name: tenet-secrets
-description: "Scans for hardcoded secrets in committed files: AWS keys, GitHub tokens, API keys, DB passwords, private keys, JWT secrets, .env files in VCS, and secrets in git history. Any hardcoded production-looking secret is ALWAYS critical severity."
+description: "Scans committed files and history for hardcoded tokens, keys, passwords, and private secrets."
 when_to_use: "Secret scan, credential leak, API key check, token exposure, tenet secrets"
 model: opus
 allowed-tools: Bash Read Grep Glob Write

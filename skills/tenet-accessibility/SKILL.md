@@ -1,6 +1,6 @@
 ---
 name: tenet-accessibility
-description: "Scans for accessibility issues in HTML/JSX/TSX/Vue/Svelte: missing alt text, interactive elements without keyboard handlers, missing ARIA labels, color contrast issues, form inputs without labels, heading hierarchy skips, and missing lang attribute."
+description: "Audits web accessibility issues in HTML, JSX, TSX, Vue, and Svelte UI code."
 when_to_use: "Accessibility audit, a11y check, ARIA labels, alt text, WCAG compliance, tenet accessibility"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

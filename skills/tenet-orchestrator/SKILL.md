@@ -1,6 +1,6 @@
 ---
 name: tenet-orchestrator
-description: "Main entry point for Tenet audits. Coordinates all dimension skills, aggregates findings into a single report, and uploads to the Tenet dashboard. Use this to run a full health audit on the current project."
+description: "Runs the full Tenet audit, coordinates dimensions, builds the report, and uploads to dashboard."
 when_to_use: "Run a Tenet audit, healthcheck, health check, project audit, code quality audit, run tenet, tenet report"
 disable-model-invocation: true
 model: opus

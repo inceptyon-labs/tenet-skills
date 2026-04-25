@@ -1,6 +1,6 @@
 ---
 name: tenet-testing
-description: "Evaluates test coverage and test quality: coverage percentage, test-to-source file ratio, presence of critical-path tests, flaky test markers, and missing test categories (integration, E2E)."
+description: "Audits test coverage, critical-path tests, flaky markers, and missing test categories."
 when_to_use: "Test coverage audit, test quality, flaky tests, missing tests, tenet testing"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

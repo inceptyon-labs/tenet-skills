@@ -1,6 +1,6 @@
 ---
 name: tenet-build-ci
-description: "Audits build and CI configuration: CI config presence, build reproducibility (lockfiles, pinned tool versions), lint/typecheck/test in CI pipeline, secrets handling via CI secret store, branch protection, and Docker image security."
+description: "Audits CI, reproducible builds, lockfiles, pinned tools, secret handling, and image security."
 when_to_use: "CI audit, build config review, Docker security, GitHub Actions review, tenet build-ci"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

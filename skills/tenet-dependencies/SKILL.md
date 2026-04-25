@@ -1,6 +1,6 @@
 ---
 name: tenet-dependencies
-description: "Audits project dependencies for known CVEs, unmaintained packages, duplicate dependencies, unused dependencies, and severely outdated versions."
+description: "Audits dependencies for CVEs, stale packages, duplicates, unused deps, and outdated versions."
 when_to_use: "Dependency audit, CVE scan, outdated packages, npm audit, pip-audit, tenet dependencies"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

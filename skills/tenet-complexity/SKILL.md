@@ -1,6 +1,6 @@
 ---
 name: tenet-complexity
-description: "Measures code complexity: cyclomatic complexity per function, cognitive complexity, max nesting depth, file length, and function length. Flags functions and files that exceed complexity thresholds."
+description: "Measures function/file complexity, nesting, length, and maintainability thresholds."
 when_to_use: "Complexity audit, cyclomatic complexity, function length, nesting depth, code complexity, tenet complexity"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write

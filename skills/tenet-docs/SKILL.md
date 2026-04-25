@@ -1,6 +1,6 @@
 ---
 name: tenet-docs
-description: "Evaluates documentation quality: README completeness, inline doc coverage on public APIs, ADR/decision log presence, changelog presence, and documentation freshness."
+description: "Audits README/API docs, ADRs, changelog, documentation coverage, and freshness."
 when_to_use: "Documentation audit, README check, JSDoc coverage, API docs, tenet docs"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write
