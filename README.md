@@ -31,6 +31,13 @@ Each audit run produces a single JSON report with per-dimension scores (0-100) a
 git clone https://github.com/inceptyon-labs/tenet-skills.git ~/src/tenet-skills
 ```
 
+Or add it as a Claude Code plugin marketplace:
+
+```text
+/plugin marketplace add inceptyon-labs/tenet-skills
+/plugin install tenet-skills@tenet-skills
+```
+
 ### 2. Enable the plugin in your project
 
 Run Claude Code with the `--plugin-dir` flag pointing to your clone:
@@ -266,6 +273,18 @@ git pull
 ```
 
 Then restart Claude Code or run `/reload-plugins` in your session.
+
+Marketplace installs can be refreshed with:
+
+```text
+claude plugin update tenet-skills
+```
+
+## Marketplace Versioning
+
+The plugin follows the same release automation pattern as PASIV. Every push to `main` runs `.github/workflows/version-bump.yml`, which bumps the patch version in both `.claude-plugin/plugin.json` and `.claude-plugin/marketplace.json`, then commits `chore: bump version to x.y.z` back to `main`.
+
+The workflow skips commits that already contain `chore: bump version`, so the automation does not loop.
 
 ## Project Structure
 
