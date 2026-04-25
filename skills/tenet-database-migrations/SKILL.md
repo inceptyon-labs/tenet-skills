@@ -85,6 +85,8 @@ Every finding uses:
 - `dimension: "database-migrations"`
 - `confidence: "native"` for parsed SQL/framework migrations, `heuristic` for grep-only checks
 - fix_prompts following `shared/fix_prompt_template.md`
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries
+- Use `Line: N/A` in the `fix_prompt` and top-level `line: null` for schema-level or migration-policy gaps without an exact source line
 
 ## Output
 

@@ -316,7 +316,8 @@ Write `.healthcheck/reports/build-ci.json` conforming to the dimension report sc
 - NEVER score a project that has no CI config as applicable: false — having no CI IS the finding (critical). The dimension is applicable; the score is low.
 - ALWAYS import toolchain findings (hadolint, actionlint) when available rather than re-deriving them
 - ALWAYS deduplicate when both toolchain and native analysis detect the same issue — prefer deterministic confidence
-- ALWAYS include a `fix_prompt` on every finding — no exceptions
+- ALWAYS include a `fix_prompt` on every finding following `shared/fix_prompt_template.md` — no exceptions
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries. Use `Line: N/A` and top-level `line: null` for project-level, CI-system-level, Docker image, or lockfile findings without an exact source line.
 - Scoring math is pure arithmetic — no LLM judgment in the score computation
 - Respect `.gitignore` — only scan files tracked by git
 - Do NOT make API calls to GitHub/GitLab to check branch protection — only check for in-repo evidence

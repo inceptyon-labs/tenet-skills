@@ -156,7 +156,7 @@
           },
           "fix_prompt": {
             "type": "string",
-            "description": "Self-contained prompt for Claude Code to fix this finding"
+            "description": "Self-contained prompt for Claude Code to fix this finding. Must follow shared/fix_prompt_template.md and include a Location section with '- File:', '- Line:', and '- Dimension:' entries that mirror the finding's top-level file, line, dimension, and severity fields."
           },
           "confidence": {
             "type": "string",

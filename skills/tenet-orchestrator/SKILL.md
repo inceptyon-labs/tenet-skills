@@ -156,6 +156,30 @@ Read all dimension reports and aggregate into the final payload matching the sch
 }
 ```
 
+Before writing or uploading `final-report.json`, validate every finding against the shared fix prompt contract:
+
+- `fix_prompt` must contain a `## Location` section.
+- `fix_prompt` must contain `- File: ...`.
+- `fix_prompt` must contain `- Line: ...`.
+- `fix_prompt` must contain `- Dimension: <dimension> / <severity>`.
+- The `- File:` value must match the finding's top-level `file` field, or `N/A` when `file` is `null`.
+- The `- Line:` value must match the finding's top-level `line` field, or `N/A` when `line` is `null`.
+- For findings with a precise source location, `line` is a 1-based integer and `- Line:` uses the same integer.
+- For file-level, project-level, dependency-level, cloud-account-level, or other non-local findings, `line` is `null` and `- Line: N/A`.
+
+If a specialist skill emits a finding with a missing or malformed `fix_prompt`, do not upload the raw malformed finding. Repair only the structural wrapper by prepending this standard Location block while preserving the specialist's original guidance below it:
+
+```markdown
+# Fix: <finding.title>
+
+## Location
+- File: <finding.file or N/A>
+- Line: <finding.line or N/A>
+- Dimension: <finding.dimension> / <finding.severity>
+```
+
+If the finding has no meaningful original `fix_prompt`, synthesize a minimal prompt with Context, Required change, Constraints, and Verification sections from the finding's `title`, `description`, `file`, `line`, `dimension`, `severity`, and `snippet`. This normalization is a dashboard compatibility gate; specialist skills should still be fixed when they emit malformed prompts.
+
 Apply dimension weights from `.healthcheck.toml` `[weights]` section, falling back to defaults:
 
 | Dimension | Default Weight |
@@ -240,7 +264,9 @@ Delta is computed by comparing against `.healthcheck/reports/previous-report.jso
 - The composite score is the weighted average of all applicable dimension scores
 - Scoring math is pure — no LLM judgment in arithmetic
 - If a specialist skill fails, log the error, mark that dimension as `applicable: false` with a note, and continue
+- NEVER upload a finding whose `fix_prompt` is missing a `## Location` block with `- File:`, `- Line:`, and `- Dimension:` entries.
+- NEVER invent source line numbers while normalizing malformed `fix_prompt`s. Use the finding's top-level `line` value exactly, or `N/A` when it is `null`.
 
 ## fix_prompt Templates
 
-The orchestrator does not produce its own findings. All findings come from specialist skills.
+The orchestrator does not produce its own findings. All findings come from specialist skills. The orchestrator does validate and, when necessary, structurally normalizes finding `fix_prompt`s so the final report satisfies `shared/fix_prompt_template.md` and the dashboard upload contract.

@@ -85,6 +85,7 @@ Every finding uses:
 - `dimension: "supply-chain-license"`
 - `confidence: "deterministic"` for scanner output, `native` for parsed manifests/workflows, `heuristic` for grep-only checks
 - fix_prompts following `shared/fix_prompt_template.md`
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries
 
 ## Output
 
@@ -94,4 +95,4 @@ Every finding uses:
 
 - Do not make legal conclusions. Report license facts and recommend review where needed.
 - Do not require SBOMs for tiny libraries unless they publish packages or containers.
-- Use `Line: N/A` for package-level, license-policy, or project-level findings.
+- Use `Line: N/A` in the `fix_prompt` and top-level `line: null` for package-level, license-policy, or project-level findings.

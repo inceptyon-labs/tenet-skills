@@ -89,7 +89,9 @@ Severity:
 Every finding uses:
 - `dimension: "release-ops"`
 - `confidence: "native"` for parsed workflow/config/docs, `heuristic` for grep-only checks
-- `Line: N/A` for project-level release-process gaps
+- `fix_prompt` following `shared/fix_prompt_template.md`
+- `Line: N/A` in the `fix_prompt` and top-level `line: null` for project-level release-process gaps
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries
 
 ## Output
 

@@ -327,7 +327,8 @@ This skill does not consume deterministic toolchain output, so no findings carry
 
 - NEVER mark a library or CLI tool down for missing health endpoints or metrics — these apply only to server applications
 - ALWAYS exclude test files, scripts, and config files from bare-console/print counts
-- ALWAYS include a `fix_prompt` on every finding — no exceptions
+- ALWAYS include a `fix_prompt` on every finding following `shared/fix_prompt_template.md` — no exceptions
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries. Use `Line: N/A` and top-level `line: null` for service-level observability gaps without an exact source line.
 - Scoring math is pure arithmetic — no LLM judgment in the score computation
 - Respect `.gitignore` — only scan files tracked by git
 - If the project has < 100 LOC of production code, mark `applicable: false` with a note and write `score: null`

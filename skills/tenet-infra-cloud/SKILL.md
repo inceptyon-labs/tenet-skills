@@ -88,7 +88,9 @@ Severity:
 Every finding uses:
 - `dimension: "infra-cloud"`
 - `confidence: "deterministic"` for toolchain output, `native` for parsed IaC, `heuristic` for grep/doc checks
-- `Line: N/A` for cloud-account-level gaps without exact source lines
+- `fix_prompt` following `shared/fix_prompt_template.md`
+- `Line: N/A` in the `fix_prompt` and top-level `line: null` for cloud-account-level gaps without exact source lines
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries
 
 ## Output
 

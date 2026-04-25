@@ -99,6 +99,7 @@ Every finding MUST include:
 - `line: null` and `Line: N/A` in the fix_prompt for inventory/project-level gaps
 - `confidence`: `native` for language-aware review, `heuristic` for grep/config-only checks
 - `fix_prompt` following `shared/fix_prompt_template.md`
+- Every `fix_prompt` Location section MUST include `- File:`, `- Line:`, and `- Dimension:` entries
 
 ## Output
 
