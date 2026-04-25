@@ -28,7 +28,7 @@ Each audit run produces a single JSON report with per-dimension scores (0-100) a
 ### 1. Clone the plugin
 
 ```bash
-git clone https://github.com/tenet-org/tenet-skills.git ~/src/tenet-skills
+git clone https://github.com/inceptyon-labs/tenet-skills.git ~/src/tenet-skills
 ```
 
 ### 2. Enable the plugin in your project
@@ -107,25 +107,25 @@ This runs the full audit pipeline:
 
 | # | Skill | Dimension | Default Weight |
 |---|---|---|---|
-| 2 | `tenet-security` | Security vulnerabilities | 1.5 |
-| 3 | `tenet-complexity` | Code complexity metrics | 1.1 |
-| 4 | `tenet-solid` | SOLID design principles | 1.1 |
-| 5 | `tenet-performance` | Performance anti-patterns | 1.0 |
-| 6 | `tenet-dependencies` | Dependency health | 1.3 |
-| 7 | `tenet-debt` | Technical debt markers | 1.1 |
-| 8 | `tenet-testing` | Test coverage & quality | 1.1 |
-| 9 | `tenet-docs` | Documentation completeness | 0.8 |
-| 10 | `tenet-accessibility` | Accessibility (a11y) | 0.8 |
-| 11 | `tenet-api-contract` | API design consistency | 1.0 |
-| 12 | `tenet-secrets` | Hardcoded secrets | 1.5 |
-| 13 | `tenet-errors` | Error handling quality | 1.3 |
-| 14 | `tenet-observability` | Logging, metrics, tracing | 1.0 |
-| 15 | `tenet-build-ci` | Build & CI configuration | 1.0 |
-| 16 | `tenet-privacy-data` | Privacy and PII handling | 1.3 |
-| 17 | `tenet-supply-chain-license` | Supply-chain and license risk | 1.2 |
-| 18 | `tenet-infra-cloud` | Infrastructure and cloud posture | 1.2 |
-| 19 | `tenet-database-migrations` | Database migration safety | 1.1 |
-| 20 | `tenet-release-ops` | Release operations readiness | 1.0 |
+| 1 | `tenet-security` | Security vulnerabilities | 1.5 |
+| 2 | `tenet-complexity` | Code complexity metrics | 1.1 |
+| 3 | `tenet-solid` | SOLID design principles | 1.1 |
+| 4 | `tenet-performance` | Performance anti-patterns | 1.0 |
+| 5 | `tenet-dependencies` | Dependency health | 1.3 |
+| 6 | `tenet-debt` | Technical debt markers | 1.1 |
+| 7 | `tenet-testing` | Test coverage & quality | 1.1 |
+| 8 | `tenet-docs` | Documentation completeness | 0.8 |
+| 9 | `tenet-accessibility` | Accessibility (a11y) | 0.8 |
+| 10 | `tenet-api-contract` | API design consistency | 1.0 |
+| 11 | `tenet-secrets` | Hardcoded secrets | 1.5 |
+| 12 | `tenet-errors` | Error handling quality | 1.3 |
+| 13 | `tenet-observability` | Logging, metrics, tracing | 1.0 |
+| 14 | `tenet-build-ci` | Build & CI configuration | 1.0 |
+| 15 | `tenet-privacy-data` | Privacy and PII handling | 1.3 |
+| 16 | `tenet-supply-chain-license` | Supply-chain and license risk | 1.2 |
+| 17 | `tenet-infra-cloud` | Infrastructure and cloud posture | 1.2 |
+| 18 | `tenet-database-migrations` | Database migration safety | 1.1 |
+| 19 | `tenet-release-ops` | Release operations readiness | 1.0 |
 
 ## Configuration
 
@@ -143,13 +143,25 @@ semgrep = "auto"         # "auto" | "required" | "off"
 gitleaks = "required"    # gitleaks is required by default
 npm_audit = "auto"
 eslint = "auto"
+syft = "auto"
+grype = "auto"
+checkov = "auto"
+tfsec = "auto"
+kube_linter = "auto"
+conftest = "auto"
 
 [weights]
 security = 1.5           # Override dimension weight
 complexity = 1.1
+privacy-data = 1.3
+supply-chain-license = 1.2
+infra-cloud = 1.2
+database-migrations = 1.1
+release-ops = 1.0
 
 [dimensions]
 accessibility = "off"    # Disable a dimension entirely
+infra-cloud = "off"
 ```
 
 Run `/tenet-skills:tenet-toolchain-setup` to generate this file with sensible defaults for your project.
@@ -232,6 +244,8 @@ Every finding includes a `fix_prompt` — a self-contained instruction designed 
 
 In the Tenet dashboard, click "Copy fix prompt" on any finding, then paste it into Claude Code.
 
+Line references are exact and 1-based. Source-local findings must keep `finding.line` and the fix prompt `## Location` block in sync. File-level or project-level findings use `line: null` in JSON and `Line: N/A` in the fix prompt.
+
 ## Dashboard API
 
 Reports are uploaded to:
@@ -258,7 +272,8 @@ Then restart Claude Code or run `/reload-plugins` in your session.
 ```
 tenet-skills/
 ├── .claude-plugin/
-│   └── plugin.json              # Plugin manifest
+│   ├── plugin.json              # Plugin manifest
+│   └── marketplace.json         # Marketplace metadata
 ├── skills/
 │   ├── tenet-toolchain-setup/   # First-run concierge
 │   │   ├── SKILL.md
@@ -295,6 +310,7 @@ tenet-skills/
 │   ├── fix_prompt_template.md   # Fix prompt template
 │   ├── language-detect.md       # Language routing rules
 │   └── upload.sh                # Reference upload script
+├── evals/                       # Regression eval definitions
 ├── README.md
 └── .gitignore
 ```
@@ -312,7 +328,7 @@ If the Claude Code plugin specification has evolved since this date, consult the
 
 ## Related
 
-- [tenet-dashboard](https://github.com/tenet-org/tenet-dashboard) — Self-hosted web dashboard that receives and displays reports from this plugin
+- [tenet-dashboard](https://github.com/inceptyon-labs/tenet-dashboard) — Self-hosted web dashboard that receives and displays reports from this plugin
 
 ## Contributing
 
