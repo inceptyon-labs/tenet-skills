@@ -45,6 +45,7 @@ Before any dimension skill runs, the orchestrator produces a `language-census.js
 | `.cpp`, `.cc`, `.cxx`, `.hpp` | cpp |
 | `.cs` | csharp |
 | `.tf`, `.tfvars` | terraform |
+| `.rego` | rego |
 | `.yaml`, `.yml` | yaml |
 | `.json` | json |
 | `.md`, `.mdx` | markdown |

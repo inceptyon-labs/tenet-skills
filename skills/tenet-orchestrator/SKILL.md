@@ -93,7 +93,12 @@ Read `language-census.json` and `.healthcheck.toml` to determine which dimension
 | secrets | Never skipped |
 | errors | Never skipped |
 | observability | Never skipped |
-| build-ci | No CI config files (.github/workflows/, .gitlab-ci.yml, Jenkinsfile) |
+| build-ci | Never skipped — missing CI config is itself a critical finding |
+| privacy-data | No PII/user/customer/data-handling surface detected |
+| supply-chain-license | No dependency manifests, containers, or CI workflows detected |
+| infra-cloud | No IaC, Kubernetes, Docker Compose, or cloud deployment config detected |
+| database-migrations | No schema or migration files detected |
+| release-ops | No deployable app, package publish path, or release workflow detected |
 
 Also check `[dimensions]` section of `.healthcheck.toml` for explicit `"off"` overrides.
 
@@ -118,6 +123,11 @@ For each applicable dimension, invoke the specialist skill:
 - `tenet-skills:tenet-errors`
 - `tenet-skills:tenet-observability`
 - `tenet-skills:tenet-build-ci`
+- `tenet-skills:tenet-privacy-data`
+- `tenet-skills:tenet-supply-chain-license`
+- `tenet-skills:tenet-infra-cloud`
+- `tenet-skills:tenet-database-migrations`
+- `tenet-skills:tenet-release-ops`
 
 Each skill writes its output to `.healthcheck/reports/{dimension}.json`.
 
@@ -152,16 +162,21 @@ Apply dimension weights from `.healthcheck.toml` `[weights]` section, falling ba
 |---|---|
 | security | 1.5 |
 | secrets | 1.5 |
+| privacy-data | 1.3 |
 | dependencies | 1.3 |
 | errors | 1.3 |
+| supply-chain-license | 1.2 |
+| infra-cloud | 1.2 |
 | solid | 1.1 |
 | complexity | 1.1 |
 | debt | 1.1 |
 | testing | 1.1 |
+| database-migrations | 1.1 |
 | performance | 1.0 |
 | api-contract | 1.0 |
 | observability | 1.0 |
 | build-ci | 1.0 |
+| release-ops | 1.0 |
 | docs | 0.8 |
 | accessibility | 0.8 |
 

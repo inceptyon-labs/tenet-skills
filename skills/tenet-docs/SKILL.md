@@ -214,7 +214,7 @@ Apply the standard scoring formula:
 
 ```
 score = 100 - (5 * critical_count) - (2 * major_count) - (0.5 * minor_count)
-score = max(0, min(100, round(score)))
+score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's rounding
 ```
 
 Info findings do NOT affect the score.
@@ -248,7 +248,7 @@ Write the dimension report to `.healthcheck/reports/docs.json`:
 
 ## Output
 
-- `.healthcheck/reports/docs.json` — dimension report conforming to the schema in `shared/schema.json`
+- `.healthcheck/reports/docs.json` — dimension report using the dimension fields and finding schema in `shared/schema.json`
 
 ## Constraints
 
@@ -275,7 +275,7 @@ cannot determine how to install dependencies or set up a development environment
 
 ## Location
 - File: README.md
-- Line: n/a (whole-file structure)
+- Line: N/A
 - Dimension: docs / major
 
 ## Current behavior
@@ -318,7 +318,7 @@ their purpose, parameters, and return values.
 
 ## Location
 - File: src/utils/transform.ts
-- Line: 12, 28, 45, 62, 78, 95, 110, 130
+- Line: 12
 - Dimension: docs / minor
 
 ## Current behavior
@@ -336,6 +336,8 @@ Add a JSDoc block above each exported function with:
 - `@returns` describing the return value
 - `@throws` if the function can throw
 - `@example` for non-obvious usage (optional but encouraged)
+
+Apply this to the exports currently starting at lines 12, 28, 45, 62, 78, 95, 110, and 130.
 
 Example:
 ```ts
@@ -374,7 +376,7 @@ loss and repeated debates.
 
 ## Location
 - File: docs/adr/ (directory to create)
-- Line: n/a
+- Line: N/A
 - Dimension: docs / minor
 
 ## Current behavior

@@ -227,7 +227,7 @@ Apply the standard scoring formula:
 
 ```
 score = 100 - (5 * critical_count) - (2 * major_count) - (0.5 * minor_count)
-score = max(0, min(100, round(score)))
+score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's rounding
 ```
 
 Info findings do NOT affect the score.
@@ -265,7 +265,7 @@ Write the dimension report to `.healthcheck/reports/accessibility.json`:
 
 ## Output
 
-- `.healthcheck/reports/accessibility.json` — dimension report conforming to the schema in `shared/schema.json`
+- `.healthcheck/reports/accessibility.json` — dimension report using the dimension fields and finding schema in `shared/schema.json`
 
 ## Constraints
 

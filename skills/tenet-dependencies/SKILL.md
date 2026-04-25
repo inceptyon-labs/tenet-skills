@@ -327,7 +327,7 @@ The project depends on postcss 8.4.20, which is affected by CVE-2023-44270 (CVSS
 
 ## Location
 - File: package.json
-- Line: N/A (dependency declaration)
+- Line: N/A
 - Dimension: dependencies / critical
 
 ## Current behavior
@@ -374,7 +374,7 @@ The project depends on the `request` npm package, which was officially deprecate
 
 ## Location
 - File: package.json
-- Line: N/A (dependency declaration)
+- Line: N/A
 - Dimension: dependencies / major
 
 ## Current behavior
@@ -428,7 +428,7 @@ The `slug` package is declared in `dependencies` in package.json but is never im
 
 ## Location
 - File: package.json
-- Line: N/A (dependency declaration)
+- Line: N/A
 - Dimension: dependencies / minor
 
 ## Current behavior

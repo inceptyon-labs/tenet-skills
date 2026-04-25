@@ -85,4 +85,4 @@ Info findings do NOT affect the score.
 
 ## Output Schema
 
-Written to `.healthcheck/reports/docs.json` conforming to the dimension object in `shared/schema.json`.
+Written to `.healthcheck/reports/docs.json` using the dimension fields and finding schema in `shared/schema.json`.

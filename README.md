@@ -12,13 +12,13 @@
 
 > *"I build in a twilight world."*
 
-A Claude Code plugin containing 17 coordinated skills for application health auditing. Produces structured reports for the **Tenet** dashboard — a self-hosted Fastify + Postgres application that tracks project health over time.
+A Claude Code plugin containing 22 coordinated skills for application health auditing. Produces structured reports for the **Tenet** dashboard — a self-hosted Fastify + Postgres application that tracks project health over time.
 
 ## What is Tenet?
 
 Tenet is a two-part system:
 
-1. **tenet-skills** (this repo) — A Claude Code plugin that audits your codebase across 14 dimensions: security, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, and build/CI.
+1. **tenet-skills** (this repo) — A Claude Code plugin that audits your codebase across 19 dimensions: security, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, build/CI, privacy/data, supply chain/license, infrastructure/cloud, database migrations, and release operations.
 2. **tenet-dashboard** (separate repo) — A self-hosted web dashboard that receives reports, tracks trends, and lets you copy fix prompts directly into Claude Code.
 
 Each audit run produces a single JSON report with per-dimension scores (0-100) and actionable findings. Every finding includes a **fix prompt** — a self-contained instruction you can paste into Claude Code to resolve the issue.
@@ -121,6 +121,11 @@ This runs the full audit pipeline:
 | 13 | `tenet-errors` | Error handling quality | 1.3 |
 | 14 | `tenet-observability` | Logging, metrics, tracing | 1.0 |
 | 15 | `tenet-build-ci` | Build & CI configuration | 1.0 |
+| 16 | `tenet-privacy-data` | Privacy and PII handling | 1.3 |
+| 17 | `tenet-supply-chain-license` | Supply-chain and license risk | 1.2 |
+| 18 | `tenet-infra-cloud` | Infrastructure and cloud posture | 1.2 |
+| 19 | `tenet-database-migrations` | Database migration safety | 1.1 |
+| 20 | `tenet-release-ops` | Release operations readiness | 1.0 |
 
 ## Configuration
 
@@ -162,6 +167,8 @@ Tenet integrates with these static analysis tools for deterministic, reproducibl
 | pip-audit | dependencies | `pipx install pip-audit` |
 | osv-scanner | dependencies | `brew install osv-scanner` |
 | trivy | dependencies, secrets | `brew install trivy` |
+| syft | supply-chain-license | `brew install syft` |
+| grype | supply-chain-license, dependencies | `brew install grype` |
 | eslint | complexity, errors | `npm install -g eslint` |
 | radon | complexity (Python) | `pipx install radon` |
 | gocyclo | complexity (Go) | `go install github.com/fzipp/gocyclo/cmd/gocyclo@latest` |
@@ -170,7 +177,11 @@ Tenet integrates with these static analysis tools for deterministic, reproducibl
 | axe-core | accessibility | `npm install -g @axe-core/cli` |
 | pa11y | accessibility | `npm install -g pa11y` |
 | markdownlint | docs | `npm install -g markdownlint-cli` |
-| tflint | security, build-ci | `brew install tflint` |
+| tflint | security, build-ci, infra-cloud | `brew install tflint` |
+| checkov | infra-cloud, security | `pipx install checkov` |
+| tfsec | infra-cloud, security | `brew install tfsec` |
+| kube-linter | infra-cloud | `brew install kube-linter` |
+| conftest | infra-cloud, build-ci | `brew install conftest` |
 
 When a tool is missing but set to `"auto"`, the corresponding skill falls back to heuristic analysis. When set to `"required"`, the run fails with an install command.
 
@@ -181,7 +192,8 @@ When a tool is missing but set to `"auto"`, the corresponding skill falls back t
 Every dimension starts at **100** and is reduced by findings:
 
 ```
-score = max(0, min(100, round(100 - 5×critical - 2×major - 0.5×minor)))
+raw = 100 - 5×critical - 2×major - 0.5×minor
+score = max(0, min(100, floor(raw + 0.5)))
 ```
 
 Info findings do not affect the score.
@@ -270,9 +282,15 @@ tenet-skills/
 │   ├── tenet-secrets/           # Hardcoded secrets
 │   ├── tenet-errors/            # Error handling
 │   ├── tenet-observability/     # Logging & metrics
-│   └── tenet-build-ci/         # Build & CI config
+│   ├── tenet-build-ci/          # Build & CI config
+│   ├── tenet-privacy-data/      # Privacy & PII handling
+│   ├── tenet-supply-chain-license/ # Supply chain & license risk
+│   ├── tenet-infra-cloud/       # Infrastructure & cloud posture
+│   ├── tenet-database-migrations/ # Database migration safety
+│   └── tenet-release-ops/       # Release operations readiness
 ├── shared/
 │   ├── schema.json              # Report JSON schema
+│   ├── dimension_schema.json    # Single-dimension report schema
 │   ├── severity.md              # Severity definitions
 │   ├── fix_prompt_template.md   # Fix prompt template
 │   ├── language-detect.md       # Language routing rules

@@ -40,7 +40,7 @@ For every tool in the Tenet toolchain catalog, check if it is installed and capt
 # Static analysis:
 #   semgrep, gitleaks, trufflehog
 # Package auditing:
-#   npm (+ npm audit), pip-audit, osv-scanner, trivy
+#   npm (+ npm audit), pip-audit, osv-scanner, trivy, syft, grype
 # Linting / complexity:
 #   eslint, radon, gocyclo
 # CI / Docker:
@@ -50,7 +50,7 @@ For every tool in the Tenet toolchain catalog, check if it is installed and capt
 # Docs:
 #   markdownlint
 # Infrastructure:
-#   tflint
+#   tflint, checkov, tfsec, kube-linter, conftest
 # Runtime support:
 #   node, python3, tree-sitter
 ```
@@ -75,7 +75,10 @@ Scan the repo to determine which tools are useful:
 | `*.go` files present | osv-scanner, gocyclo |
 | `Dockerfile` present | hadolint |
 | `.github/workflows/` present | actionlint |
-| `*.tf` files present | tflint |
+| `*.tf` files present | tflint, checkov, tfsec |
+| Kubernetes YAML / Helm charts present | kube-linter, checkov |
+| Dependency manifests or Dockerfile present | syft, grype |
+| OPA/Rego policies present | conftest |
 | JSX/TSX/HTML/Vue/Svelte files | axe, pa11y |
 | `*.md` files present | markdownlint |
 
@@ -126,8 +129,8 @@ Generate install commands per platform:
 
 **macOS (brew preferred):**
 ```bash
-brew install gitleaks trufflehog hadolint actionlint tflint
-pipx install semgrep radon pip-audit
+brew install gitleaks trufflehog hadolint actionlint tflint syft grype tfsec kube-linter conftest
+pipx install semgrep radon pip-audit checkov
 npm install -g eslint markdownlint-cli @axe-core/cli pa11y
 ```
 
@@ -189,6 +192,12 @@ npm_audit = "auto"
 pip_audit = "auto"
 osv_scanner = "auto"
 trivy = "auto"
+syft = "auto"
+grype = "auto"
+checkov = "auto"
+tfsec = "auto"
+kube_linter = "auto"
+conftest = "auto"
 eslint = "auto"
 radon = "auto"
 gocyclo = "auto"
@@ -202,16 +211,21 @@ tflint = "auto"
 [weights]
 security = 1.5
 secrets = 1.5
+privacy-data = 1.3
 dependencies = 1.3
 errors = 1.3
+supply-chain-license = 1.2
+infra-cloud = 1.2
 solid = 1.1
 complexity = 1.1
 debt = 1.1
 testing = 1.1
+database-migrations = 1.1
 performance = 1.0
-api_contract = 1.0
+api-contract = 1.0
 observability = 1.0
-build_ci = 1.0
+build-ci = 1.0
+release-ops = 1.0
 docs = 0.8
 accessibility = 0.8
 

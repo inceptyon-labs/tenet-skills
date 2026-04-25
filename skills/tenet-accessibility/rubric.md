@@ -122,4 +122,4 @@ When both toolchain and source-level scans flag the same issue:
 
 ## Output Schema
 
-Written to `.healthcheck/reports/accessibility.json` conforming to the dimension object in `shared/schema.json`.
+Written to `.healthcheck/reports/accessibility.json` using the dimension fields and finding schema in `shared/schema.json`.

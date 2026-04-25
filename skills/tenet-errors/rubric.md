@@ -64,7 +64,7 @@ Toolchain findings are imported with `confidence: "deterministic"` and deduplica
 
 ```
 score = 100 - (5 * critical + 2 * major + 0.5 * minor)
-score = max(0, min(100, round(score)))
+score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's rounding
 ```
 
 - Info findings do NOT affect the score.

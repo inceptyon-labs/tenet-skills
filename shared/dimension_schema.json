@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Tenet Dimension Report",
+  "description": "Schema for a single Tenet dimension report written to .healthcheck/reports/{dimension}.json before orchestration.",
+  "type": "object",
+  "required": ["key", "score", "weight", "skill_version", "notes", "applicable", "findings"],
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Dimension identifier, e.g. security, build-ci, privacy-data"
+    },
+    "score": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "description": "0-100 integer score, null if not applicable"
+    },
+    "weight": {
+      "type": "number",
+      "minimum": 0.1,
+      "maximum": 3.0,
+      "description": "Default weight for the dimension before dashboard overrides"
+    },
+    "skill_version": {
+      "type": "string",
+      "description": "Version of the skill that produced this report"
+    },
+    "notes": {
+      "type": "string",
+      "description": "One paragraph summary of what was examined and headline finding"
+    },
+    "applicable": {
+      "type": "boolean",
+      "description": "Whether this dimension applies to the project"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "Dimension-specific key-value metrics",
+      "additionalProperties": true
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "schema.json#/properties/findings/items"
+      }
+    }
+  }
+}

@@ -64,6 +64,21 @@
       ],
       "files": [],
       "assertions": []
+    },
+    {
+      "id": 5,
+      "name": "ops-privacy-supplychain-infra-db-release",
+      "prompt": "Run the tenet-privacy-data, tenet-supply-chain-license, tenet-infra-cloud, tenet-database-migrations, and tenet-release-ops skills against this codebase. Check PII handling and retention, SBOM/license/provenance gaps, infrastructure-as-code exposure, migration safety, and release/rollback readiness. Write findings to .healthcheck/reports/privacy-data.json, .healthcheck/reports/supply-chain-license.json, .healthcheck/reports/infra-cloud.json, .healthcheck/reports/database-migrations.json, and .healthcheck/reports/release-ops.json. If a dimension is not applicable, set score to null and applicable to false.",
+      "expected_output": "Five JSON files. Applicable dimensions should include scored findings with fix_prompts and confidence tiers; non-applicable dimensions should set score to null and applicable to false. All findings must follow the Tenet location contract for file/line and fix_prompt Location.",
+      "skill_paths": [
+        "skills/tenet-privacy-data/SKILL.md",
+        "skills/tenet-supply-chain-license/SKILL.md",
+        "skills/tenet-infra-cloud/SKILL.md",
+        "skills/tenet-database-migrations/SKILL.md",
+        "skills/tenet-release-ops/SKILL.md"
+      ],
+      "files": [],
+      "assertions": []
     }
   ]
 }

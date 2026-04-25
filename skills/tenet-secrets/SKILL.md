@@ -252,7 +252,7 @@ Apply the standard scoring formula from `shared/severity.md`:
 
 ```
 score = 100 - (5 * critical_count + 2 * major_count + 0.5 * minor_count)
-score = max(0, min(100, round(score)))
+score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's rounding
 ```
 
 Info findings do NOT affect the score.

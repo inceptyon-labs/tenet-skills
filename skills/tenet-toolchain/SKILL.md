@@ -51,6 +51,12 @@ axe = "auto"
 pa11y = "auto"
 markdownlint = "auto"
 tflint = "auto"
+syft = "auto"
+grype = "auto"
+checkov = "auto"
+tfsec = "auto"
+kube_linter = "auto"
+conftest = "auto"
 ```
 
 ### Step 2: Check Tool Availability
@@ -86,6 +92,12 @@ Run all available tools. For each tool, capture:
 | pa11y | `pa11y --reporter json <url>` | accessibility |
 | markdownlint | `markdownlint --json . 2>&1` | docs |
 | tflint | `tflint --format=json` | security, build-ci |
+| syft | `syft dir:. -o json` | supply-chain-license |
+| grype | `grype dir:. -o json` | supply-chain-license, dependencies |
+| checkov | `checkov -d . -o json --quiet` | infra-cloud, security |
+| tfsec | `tfsec . --format json` | infra-cloud, security |
+| kube-linter | `kube-linter lint . --format json` | infra-cloud |
+| conftest | `conftest test --output json .` | infra-cloud, build-ci |
 
 Also check for and parse coverage reports:
 ```bash
@@ -121,6 +133,13 @@ For each tool that ran, normalize output to:
 
 Write per-tool files to `.healthcheck/toolchain/{tool}.json`.
 Also save the raw output to `.healthcheck/toolchain/{tool}.raw.json`.
+
+Line normalization rules:
+- `line` is always a 1-based source line number.
+- Convert source tool locations to 1-based if a tool reports 0-based positions.
+- Preserve `null` when a tool reports only a file, package, selector, or project-level issue.
+- Do not invent approximate line numbers during normalization. Specialist skills may provide placement guidance inside `fix_prompt.Required change`, not in the `line` field.
+- When a tool reports a range, store the start line in `line` and keep range details only in tool-specific metadata or the eventual finding description.
 
 ### Step 5: Generate Language Census
 
