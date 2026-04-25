@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Application health auditing suite for Claude Code. Runs deterministic static analysis plus AI-powered judgment and publishes structured reports to the Tenet dashboard.",
-    "version": "1.0.0"
+    "version": "1.0.1"
   },
   "plugins": [
     {
       "name": "tenet-skills",
       "source": "./",
       "description": "Application health auditing suite for Claude Code. 22 coordinated skills that run deterministic static analysis + AI-powered judgment to produce structured reports for the Tenet dashboard. Covers security, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, build/CI, privacy/data, supply chain/license, infrastructure/cloud, database migrations, and release operations.",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "category": "productivity",
       "tags": [
         "audit",

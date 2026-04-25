@@ -1,7 +1,7 @@
 {
   "name": "tenet-skills",
   "description": "Application health auditing suite for Claude Code. 22 coordinated skills that run deterministic static analysis + AI-powered judgment to produce structured reports for the Tenet dashboard. Covers security, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, build/CI, privacy/data, supply chain/license, infrastructure/cloud, database migrations, and release operations.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Inceptyon Labs"
   },
