@@ -248,6 +248,8 @@ Normalize recognized reports into these metrics:
 - `mutation_scoring_mode`
 - `mutation_bonus_applied`
 
+These exact `mutation_*` keys drive the dashboard's Mutation Testing panel. Do not emit only legacy placeholders such as `mutation_testing_configured` or `mutations_applied` without also filling the standardized fields above.
+
 Rating bands:
 
 | Mutation Score | Rating |

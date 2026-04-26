@@ -71,6 +71,16 @@
               }
             }
           }
+        },
+        "lines_of_code": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Repository-wide LOC count shown in the dashboard header. Prefer language-census total_loc; otherwise sum languages[].loc."
+        },
+        "files_analyzed": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Repository-wide tracked file count shown in the dashboard header. Prefer language-census total_files; otherwise sum languages[].files."
         }
       }
     },
@@ -110,8 +120,48 @@
           },
           "metrics": {
             "type": "object",
-            "description": "Dimension-specific key-value metrics",
+            "description": "Dimension-specific key-value metrics. The testing dimension should preserve standardized mutation_* metrics here so the dashboard can render the Mutation Testing panel.",
             "additionalProperties": true
+          },
+          "checks": {
+            "type": "array",
+            "description": "Structured checklist entries shown in the dashboard's 'What was tested' section for this dimension.",
+            "items": {
+              "type": "object",
+              "required": ["name", "status"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "maxLength": 256,
+                  "description": "Short label for the check or audit slice."
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["passed", "failed", "skipped", "info"],
+                  "description": "Outcome of the check."
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 1000,
+                  "description": "One-sentence explanation of what was examined."
+                },
+                "details": {
+                  "type": "string",
+                  "maxLength": 4000,
+                  "description": "Optional compact evidence, examples, or grouped results."
+                },
+                "count": {
+                  "type": ["integer", "null"],
+                  "minimum": 0,
+                  "description": "Optional count associated with this check, such as findings matched or files scanned."
+                },
+                "tool": {
+                  "type": "string",
+                  "maxLength": 64,
+                  "description": "Optional deterministic tool name backing the check, e.g. semgrep, gitleaks, or syft."
+                }
+              }
+            }
           }
         }
       }

@@ -8,7 +8,10 @@ Before any dimension skill runs, the orchestrator produces a `language-census.js
 
 ```json
 {
+  "ran_at": "2024-01-15T10:30:00Z",
   "primary_language": "typescript",
+  "total_loc": 5420,
+  "total_files": 65,
   "languages": [
     { "lang": "typescript", "loc": 4820, "files": 47, "support": "native" },
     { "lang": "terraform",  "loc": 420,  "files": 6,  "support": "heuristic" },
@@ -17,6 +20,8 @@ Before any dimension skill runs, the orchestrator produces a `language-census.js
   "manifests": ["package.json", "tsconfig.json", ".terraform.lock.hcl"]
 }
 ```
+
+The orchestrator should copy `total_loc` to `run.lines_of_code` and `total_files` to `run.files_analyzed` in the final dashboard payload. If an older census omits those totals, the orchestrator should sum `languages[].loc` and `languages[].files` instead of leaving the dashboard header blank.
 
 ## Detection Procedure
 

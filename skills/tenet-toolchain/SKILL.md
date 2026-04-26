@@ -182,6 +182,8 @@ For discovered mutation reports, write a normalized `.healthcheck/toolchain/muta
 
 If a mutation report exists but cannot be parsed confidently, preserve the raw file and write `parse_error` plus `source_path` in the normalized output so `tenet-testing` can report it as informational.
 
+Do not stop at provider-specific raw files such as `.healthcheck/mutation/muter.json`. Always produce the normalized `.healthcheck/toolchain/mutation-testing.json` when enough data is available, because the testing skill and dashboard contract rely on the standardized `mutation_*` fields derived from that file.
+
 Line normalization rules:
 - `line` is always a 1-based source line number.
 - Convert source tool locations to 1-based if a tool reports 0-based positions.
@@ -206,7 +208,10 @@ Write `.healthcheck/toolchain/language-census.json`:
 
 ```json
 {
+  "ran_at": "2024-01-15T10:30:00Z",
   "primary_language": "typescript",
+  "total_loc": 5140,
+  "total_files": 55,
   "languages": [
     { "lang": "typescript", "loc": 4820, "files": 47, "support": "native" },
     { "lang": "javascript", "loc": 320, "files": 8, "support": "native" }
@@ -214,6 +219,8 @@ Write `.healthcheck/toolchain/language-census.json`:
   "manifests": ["package.json", "tsconfig.json"]
 }
 ```
+
+`total_loc` and `total_files` are the preferred source for the dashboard header. The orchestrator copies them into `run.lines_of_code` and `run.files_analyzed` in the final payload.
 
 ### Step 6: Write Summary
 

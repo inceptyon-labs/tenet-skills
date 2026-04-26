@@ -221,6 +221,19 @@ When a tool is missing but set to `"auto"`, the corresponding skill falls back t
 
 Mutation testing is handled as a testing signal, not a standalone dimension. In Phase 1 (`mode = "informational"`), Tenet parses reports from tools such as Muter and shows score/survivor metrics without changing the health score. In Phase 2 (`mode = "bonus"`), a strong mutation score can add a small configurable bonus to the Testing dimension; missing or weak mutation results do not subtract points.
 
+## Dashboard Contract
+
+These payload fields directly power specific parts of the Tenet dashboard:
+
+- `run.files_analyzed` → header value for **Files Analyzed**
+- `run.lines_of_code` → header value for **Lines of Code**
+- `dimensions[].checks` → per-dimension **What was tested** checklist
+- `dimensions[key="testing"].metrics.mutation_*` → **Mutation Testing** panel shown below the dimension table
+
+If `checks` is omitted, the dashboard intentionally falls back to: "This skill did not report a structured list of checks. Score is derived from findings, metrics, and skill heuristics."
+
+For mutation data, use the standardized testing metrics keys documented in `skills/tenet-testing/SKILL.md` (`mutation_available`, `mutation_provider`, `mutation_report_path`, `mutation_score_pct`, `mutation_mutants_*`, etc.). Ad hoc keys such as `mutation_testing_configured` or `mutations_applied` are not enough by themselves to light up the mutation panel.
+
 ## Scoring
 
 ### Formula

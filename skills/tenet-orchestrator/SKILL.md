@@ -149,12 +149,45 @@ Read all dimension reports and aggregate into the final payload matching the sch
     "completed_at": "<ISO-8601>",
     "orchestrator_version": "1.0.0",
     "dimensions_run": ["security", "complexity", ...],
-    "toolchain_summary": { ... }
+    "toolchain_summary": { ... },
+    "lines_of_code": 18420,
+    "files_analyzed": 142
   },
   "dimensions": [ ... ],
   "findings": [ ... ]
 }
 ```
+
+Dashboard compatibility contract:
+- `run.files_analyzed` drives the **Files Analyzed** header value.
+- `run.lines_of_code` drives the **Lines of Code** header value.
+- `dimensions[].checks` drives each dimension's **What was tested** section. If this array is missing or empty, the dashboard falls back to a generic "This skill did not report a structured list of checks" message.
+- `dimensions[key="testing"].metrics.mutation_*` drives the dedicated **Mutation Testing** panel that appears below the dimension table.
+
+Populate `run.lines_of_code` and `run.files_analyzed` from `.healthcheck/toolchain/language-census.json`. Prefer `total_loc` and `total_files` when present. If an older census omits those totals, sum `languages[].loc` and `languages[].files` instead of leaving the header blank.
+
+Every aggregated dimension entry must carry forward:
+- `applicable`
+- `metrics` (use `{}` when the specialist skill has none)
+- `checks` (preserve the specialist's structured checks when present)
+
+If a specialist skill omits `checks` or returns an empty list, synthesize a compact structured checklist before upload. Use the dimension's rubric/procedure, metrics, toolchain evidence, and findings to create 3-8 entries that honestly describe what was evaluated. Example shape:
+
+```json
+{
+  "name": "Line coverage threshold",
+  "status": "failed",
+  "count": 27,
+  "tool": "coverage",
+  "description": "Compared reported line coverage against the configured healthy threshold."
+}
+```
+
+Synthesis rules:
+- Prefer one check per major rubric slice or deterministic tool-backed sub-audit.
+- Use `passed` for evaluated healthy checks, `failed` for gaps that produced findings, `skipped` when the dimension is not applicable or a sub-check genuinely does not apply, and `info` for observational signals such as mutation-report presence without score impact.
+- Keep check names concrete, not generic score summaries.
+- Do not invent tool names unless a real deterministic tool or normalized artifact backed the check.
 
 Mutation testing is not a separate dimension. Preserve standardized mutation metrics from `.healthcheck/reports/testing.json` under the testing dimension's `metrics` object so the dashboard can render a dedicated mutation card or graph without changing composite-score semantics:
 
@@ -174,6 +207,8 @@ Mutation testing is not a separate dimension. Preserve standardized mutation met
   }
 }
 ```
+
+If `testing.metrics` lacks the standardized `mutation_*` keys but `.healthcheck/toolchain/mutation-testing.json` exists, backfill those fields from the normalized toolchain artifact before upload. If the toolchain artifact is missing but a configured raw report such as `.healthcheck/mutation/muter.json` is available and parseable, normalize it first and then populate the standardized `mutation_*` fields. Legacy placeholders such as `mutation_testing_configured` or `mutations_applied` are not sufficient for dashboard rendering on their own.
 
 Phase behavior:
 - **Phase 1:** mutation metrics and `info` findings are surfaced in the testing dimension, but they do not affect the testing score or composite score.
