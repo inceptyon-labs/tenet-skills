@@ -9,6 +9,10 @@ score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's 
 
 Info findings do NOT affect the score.
 
+Mutation testing has special Phase 1 / Phase 2 handling:
+- **Phase 1 (`mode = "informational"`):** mutation results are reported in metrics, notes, and actionable `info` findings only.
+- **Phase 2 (`mode = "bonus"`):** strong mutation results may add a small configured bonus to the testing score after normal deductions. Weak, missing, stale, or malformed mutation results never subtract points.
+
 ## Finding Categories
 
 ### 1. Coverage Percentage
@@ -34,7 +38,54 @@ Per-file coverage (if per-file data available):
 
 **Confidence:** `deterministic` (when parsed from a coverage report)
 
-### 2. Test-to-Source File Ratio
+### 2. Mutation Testing Evidence
+
+**Source:** `.healthcheck/toolchain/mutation-testing.json` or configured report paths under `[testing.mutation].report_paths`.
+
+Supported provider examples:
+- **Swift:** Muter
+- **JavaScript/TypeScript:** Stryker
+- **Java:** PIT
+- **Python:** mutmut or cosmic-ray
+- **PHP:** Infection
+
+Default config:
+
+```toml
+[testing.mutation]
+mode = "informational" # off | informational | bonus
+minimum_score = 70
+excellent_score = 85
+bonus_points = 2
+scope = "changed_files"
+```
+
+Rating bands:
+
+| Mutation Score | Rating |
+|---|---|
+| >= `excellent_score` | `excellent` |
+| >= `minimum_score` | `good` |
+| 50 - (`minimum_score` - 0.01) | `weak` |
+| < 50 | `poor` |
+
+Findings:
+
+| Condition | Severity |
+|---|---|
+| Mutation report missing while mode is `informational` or `bonus` | `info` (actionable setup suggestion, only when tests already exist) |
+| Report has survived mutants | `info` |
+| Report is stale, malformed, or missing totals | `info` |
+| Mutation score below threshold | `info` |
+
+Score impact:
+- `off`: no metrics, no findings, no score effect.
+- `informational`: no score effect.
+- `bonus`: if report is valid and `mutation_score_pct >= minimum_score`, add `bonus_points` after normal scoring and cap at 100.
+
+**Confidence:** `deterministic` for structured reports; `heuristic` for loosely parsed CLI text.
+
+### 3. Test-to-Source File Ratio
 
 **Source:** `git ls-files` with language-specific test file patterns.
 
@@ -57,7 +108,7 @@ Test file patterns by language:
 
 **Confidence:** `deterministic`
 
-### 3. Critical-Path Test Presence
+### 4. Critical-Path Test Presence
 
 **Source:** Filename heuristic matching for auth, payment, data mutation, and cryptography modules.
 
@@ -77,7 +128,7 @@ Cap at 15 findings. Aggregate beyond that into a summary finding.
 
 **Confidence:** `heuristic`
 
-### 4. Flaky Test Markers
+### 5. Flaky Test Markers
 
 **Source:** `grep` for skip/focus/flaky patterns across test files.
 
@@ -107,7 +158,7 @@ Always `major` regardless of age.
 
 **Confidence:** `deterministic`
 
-### 5. Missing Test Categories
+### 6. Missing Test Categories
 
 **Source:** Directory structure analysis and framework config detection.
 
@@ -128,7 +179,7 @@ Test categories:
 
 **Confidence:** `heuristic`
 
-### 6. Test Quality Signals
+### 7. Test Quality Signals
 
 | Condition | Severity |
 |---|---|
@@ -158,6 +209,20 @@ Test categories:
 | `test_categories_missing` | List of expected but absent test categories |
 | `frameworks_detected` | List of test frameworks found (jest, vitest, pytest, etc.) |
 | `zero_coverage_files` | Count of source files with 0% coverage |
+| `mutation_available` | Whether a mutation testing report was found and parsed |
+| `mutation_provider` | Tool/provider name, e.g. muter, stryker, pit, mutmut |
+| `mutation_report_path` | Report path used for mutation metrics |
+| `mutation_scope` | Scope of mutation run, e.g. changed_files, full, module |
+| `mutation_scoring_mode` | off, informational, or bonus |
+| `mutation_score_pct` | Killed mutants divided by total non-equivalent mutants |
+| `mutation_rating` | excellent, good, weak, poor, unavailable, or invalid |
+| `mutation_mutants_total` | Total mutants considered |
+| `mutation_mutants_killed` | Mutants killed by tests |
+| `mutation_mutants_survived` | Mutants that survived the test suite |
+| `mutation_mutants_timed_out` | Mutants that timed out |
+| `mutation_mutants_equivalent` | Mutants marked equivalent/ignored when available |
+| `mutation_bonus_applied` | Numeric score bonus applied in Phase 2 |
+| `mutation_worst_files` | Top files/modules by survived mutant count |
 
 ## Output
 

@@ -51,6 +51,8 @@ For every tool in the Tenet toolchain catalog, check if it is installed and capt
 #   markdownlint
 # Infrastructure:
 #   tflint, checkov, tfsec, kube-linter, conftest
+# Mutation report providers (optional; Tenet ingests reports but does not run them by default):
+#   muter
 # Runtime support:
 #   node, python3, tree-sitter
 ```
@@ -81,6 +83,7 @@ Scan the repo to determine which tools are useful:
 | OPA/Rego policies present | conftest |
 | JSX/TSX/HTML/Vue/Svelte files | axe, pa11y |
 | `*.md` files present | markdownlint |
+| Swift package or Xcode project present | muter optional, mutation report ingestion config |
 
 Write results to `.healthcheck/project-needs.json`:
 
@@ -132,6 +135,9 @@ Generate install commands per platform:
 brew install gitleaks trufflehog hadolint actionlint tflint syft grype tfsec kube-linter conftest
 pipx install semgrep radon pip-audit checkov
 npm install -g eslint markdownlint-cli @axe-core/cli pa11y
+
+# Swift/Xcode projects only, when the team wants to generate mutation reports:
+brew install muter-mutation-testing/formulae/muter
 ```
 
 **Ubuntu/Debian:**
@@ -141,6 +147,7 @@ pipx install semgrep radon pip-audit
 npm install -g eslint markdownlint-cli @axe-core/cli pa11y
 # gitleaks: download from GitHub releases
 # hadolint: download from GitHub releases
+# muter: install from the Muter GitHub release or project-recommended package manager
 ```
 
 For corporate/locked-down environments (detect via `npm config get registry` pointing to internal mirror or `.npmrc` with proxy), flag this and print commands WITHOUT running them, with a note about proxy/SSO requirements.
@@ -233,6 +240,29 @@ accessibility = 0.8
 # Set to "off" to disable a dimension entirely
 # security = "off"
 # accessibility = "off"
+
+[testing.mutation]
+# Tenet ingests mutation reports; the target project CI/local scripts run mutation tools.
+# off | informational | bonus
+mode = "informational"
+minimum_score = 70
+excellent_score = 85
+bonus_points = 2
+scope = "changed_files"
+report_paths = [
+  ".healthcheck/mutation/mutation-testing.json",
+  ".healthcheck/mutation/muter.json",
+  "mutation-report.json",
+  "reports/mutation-testing.json"
+]
+```
+
+For Swift/Xcode projects, include Muter in the optional gap report but do not mark it required by default. Print a note recommending that the target project add a CI step which runs Muter on changed files and writes the report to one of `[testing.mutation].report_paths`, for example:
+
+```bash
+mkdir -p .healthcheck/mutation
+muter --format json --output .healthcheck/mutation/muter.json \
+  --files-to-mutate "$(git diff --name-only HEAD~1 HEAD | tr '\n' ',')"
 ```
 
 **IMPORTANT:** If `.healthcheck.toml` already exists, write to `.healthcheck.toml.new` instead and diff them for the user. NEVER overwrite silently.

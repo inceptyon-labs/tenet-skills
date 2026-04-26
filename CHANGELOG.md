@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Mutation testing report ingestion for the Testing dimension, including Phase 1 informational reporting and Phase 2 opt-in score bonus behavior.
+- Standard mutation metrics for dashboard drilldowns, including provider, scope, score, rating, killed/survived/timed-out counts, worst files, and bonus applied.
+- Toolchain/setup guidance for discovering mutation reports and optional Swift/Muter configuration without running mutation tools from Tenet by default.
+
 ## [1.0.0] - 2026-04-17
 
 ### Added

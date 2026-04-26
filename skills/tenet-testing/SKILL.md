@@ -10,7 +10,7 @@ allowed-tools: Bash Read Grep Glob Write
 
 > *"Untested code is broken code you haven't noticed yet."*
 
-Evaluates the health of a project's test suite across five axes: coverage percentage, test-to-source file ratio, critical-path test presence, flaky test markers, and missing test categories. Consumes coverage reports from the toolchain when available and falls back to structural analysis when not.
+Evaluates the health of a project's test suite across six axes: coverage percentage, mutation testing evidence, test-to-source file ratio, critical-path test presence, flaky test markers, and missing test categories. Consumes coverage and mutation reports from the toolchain when available and falls back to structural analysis when not.
 
 ## Purpose
 
@@ -83,9 +83,59 @@ find . -maxdepth 4 \( \
 
 If no coverage report exists at all, log that coverage data is unavailable and use structural analysis only. Do NOT set coverage-related findings to `critical` just because no report exists — the absence of a coverage report is itself a finding.
 
-### Secondary: `.healthcheck/toolchain/language-census.json`
+### Secondary: `.healthcheck/toolchain/mutation-testing.json`
+
+If the toolchain discovered mutation testing output from Muter, Stryker, PIT, mutmut, Infection, or another supported provider, consume it as a test-quality signal:
+
+```json
+{
+  "tool": "mutation-testing",
+  "provider": "muter",
+  "source_path": ".healthcheck/mutation/muter.json",
+  "scope": "changed_files",
+  "summary": {
+    "mutation_score_pct": 74.2,
+    "mutants_total": 132,
+    "mutants_killed": 98,
+    "mutants_survived": 28,
+    "mutants_timed_out": 6,
+    "mutants_equivalent": 0
+  },
+  "survivors_by_file": [
+    { "file": "Sources/App/AuthService.swift", "survived": 8, "total": 21 }
+  ]
+}
+```
+
+Mutation testing is report ingestion only. This skill does **not** run Muter or any mutation engine; those runs belong in the target project's CI/local tooling because they are slow, language-specific, and often require simulator or build-system setup.
+
+### Tertiary: `.healthcheck/toolchain/language-census.json`
 
 Used to determine the primary language and calibrate framework expectations.
+
+## Configuration
+
+Read `.healthcheck.toml` and apply optional mutation settings:
+
+```toml
+[testing.mutation]
+# off | informational | bonus
+mode = "informational"
+minimum_score = 70
+excellent_score = 85
+bonus_points = 2
+scope = "changed_files"
+report_paths = [
+  ".healthcheck/mutation/mutation-testing.json",
+  ".healthcheck/mutation/muter.json",
+  "mutation-report.json"
+]
+```
+
+Modes:
+- `off` — ignore mutation testing reports entirely.
+- `informational` — Phase 1 behavior. Parse and display mutation results, emit actionable `info` findings for weak surviving mutants, but do not alter the testing score.
+- `bonus` — Phase 2 behavior. If a recent valid mutation report exists and `mutation_score_pct >= minimum_score`, add `bonus_points` to the testing score after normal finding deductions, capped at 100. Missing mutation data and low mutation scores never subtract points.
 
 ## Procedure
 
@@ -164,6 +214,55 @@ Coverage findings:
 Per-file coverage analysis (if per-file data available):
 - Files with 0% coverage in `src/` (non-test, non-config) → `minor` per file (cap at 10 findings)
 - Critical-path files with < 50% coverage → `major` (see Step 3 for critical-path detection)
+
+### Step 1b: Parse Mutation Testing Data
+
+If `[testing.mutation].mode = "off"`, skip this step.
+
+Read `.healthcheck/toolchain/mutation-testing.json` if present. If it does not exist, search the configured `report_paths` and common report names:
+
+```bash
+find . -maxdepth 5 \( \
+  -name "mutation-testing.json" -o \
+  -name "mutation-report.json" -o \
+  -name "muter.json" -o \
+  -name "muter-output.json" -o \
+  -name "stryker.json" -o \
+  -name "pitest.xml" \
+\) -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null
+```
+
+Normalize recognized reports into these metrics:
+- `mutation_available`
+- `mutation_provider`
+- `mutation_report_path`
+- `mutation_scope`
+- `mutation_score_pct`
+- `mutation_rating`
+- `mutation_mutants_total`
+- `mutation_mutants_killed`
+- `mutation_mutants_survived`
+- `mutation_mutants_timed_out`
+- `mutation_mutants_equivalent`
+- `mutation_worst_files`
+- `mutation_scoring_mode`
+- `mutation_bonus_applied`
+
+Rating bands:
+
+| Mutation Score | Rating |
+|---|---|
+| >= `excellent_score` | `excellent` |
+| >= `minimum_score` | `good` |
+| 50 - (`minimum_score` - 0.01) | `weak` |
+| < 50 | `poor` |
+
+Findings:
+- No mutation report found in `informational` or `bonus` mode → optional `info` finding: "Mutation testing is not configured". This is actionable, but do not emit it if the project has no meaningful test suite yet; the no-tests findings already cover the larger problem.
+- Mutation report exists with surviving mutants → `info` finding: "Surviving mutants indicate weak assertions". Include the worst files and survivor counts.
+- Mutation report is stale, malformed, or missing totals → `info` finding: "Mutation testing report cannot be trusted".
+
+Do not emit `minor`, `major`, or `critical` findings for mutation score in Phase 1 or Phase 2. Mutation data is an informational signal plus an opt-in confidence bonus only.
 
 ### Step 2: Compute Test-to-Source File Ratio
 
@@ -340,6 +439,14 @@ score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's 
 
 Info findings do NOT affect the score.
 
+If `[testing.mutation].mode = "bonus"` and a valid mutation report has `mutation_score_pct >= minimum_score`, apply the configured bonus after the standard score calculation:
+
+```
+score = min(100, score + bonus_points)
+```
+
+Record the exact bonus in `metrics.mutation_bonus_applied`. Never subtract points for missing mutation data, a low mutation score, survived mutants, timeouts, or malformed reports during Phase 1 or Phase 2.
+
 ### Step 8: Write Report
 
 Write the dimension report to `.healthcheck/reports/testing.json`:
@@ -369,7 +476,23 @@ Write the dimension report to `.healthcheck/reports/testing.json`:
     "test_categories_present": ["unit"],
     "test_categories_missing": ["integration", "e2e"],
     "frameworks_detected": ["jest", "testing-library"],
-    "zero_coverage_files": 14
+    "zero_coverage_files": 14,
+    "mutation_available": true,
+    "mutation_provider": "muter",
+    "mutation_report_path": ".healthcheck/toolchain/mutation-testing.json",
+    "mutation_scope": "changed_files",
+    "mutation_scoring_mode": "informational",
+    "mutation_score_pct": 74.2,
+    "mutation_rating": "good",
+    "mutation_mutants_total": 132,
+    "mutation_mutants_killed": 98,
+    "mutation_mutants_survived": 28,
+    "mutation_mutants_timed_out": 6,
+    "mutation_mutants_equivalent": 0,
+    "mutation_bonus_applied": 0,
+    "mutation_worst_files": [
+      { "file": "Sources/App/AuthService.swift", "survived": 8, "total": 21 }
+    ]
   },
   "findings": [ ... ]
 }
@@ -382,6 +505,8 @@ Each finding follows the schema in `shared/schema.json` and includes a `fix_prom
 | Detection Method | Confidence |
 |---|---|
 | Coverage percentage from lcov/cobertura/cover.out | `deterministic` |
+| Mutation score from supported report artifact | `deterministic` |
+| Mutation score from loosely parsed CLI text | `heuristic` |
 | Test-to-source ratio (file counting) | `deterministic` |
 | Critical-path file detection (filename heuristic) | `heuristic` |
 | Skip/only/flaky marker detection (grep) | `deterministic` |
@@ -534,6 +659,8 @@ layer, so no test verifies actual database queries or API-to-database flow.
 ## Constraints
 
 - **Coverage data is optional:** If no coverage report exists, degrade gracefully. Report the absence as a finding but do not penalize the score as if coverage were 0%.
+- **Mutation data is optional:** Missing mutation reports do not lower the score. In `informational` mode, mutation results only appear in metrics, notes, and actionable `info` findings. In `bonus` mode, strong mutation results may raise the testing score slightly, but weak or missing results never lower it.
+- **Do not run mutation tools:** This skill parses mutation reports only. Muter, Stryker, PIT, mutmut, and similar tools should be run by the target project's CI/local scripts.
 - **Respect .gitignore:** Use `git ls-files` for all file listing. Never scan `node_modules/`, `vendor/`, etc.
 - **Framework-aware file matching:** Use the detected framework to calibrate test file patterns. A Go project uses `_test.go`, not `*.test.go`.
 - **Critical-path detection is heuristic:** Filename-based detection of auth/payment modules is imperfect. Set confidence to `heuristic` for these findings.

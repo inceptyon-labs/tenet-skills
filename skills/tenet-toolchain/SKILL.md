@@ -57,6 +57,15 @@ checkov = "auto"
 tfsec = "auto"
 kube_linter = "auto"
 conftest = "auto"
+
+[testing.mutation]
+mode = "informational"
+report_paths = [
+  ".healthcheck/mutation/mutation-testing.json",
+  ".healthcheck/mutation/muter.json",
+  "mutation-report.json",
+  "reports/mutation-testing.json"
+]
 ```
 
 ### Step 2: Check Tool Availability
@@ -105,6 +114,19 @@ Also check for and parse coverage reports:
 # lcov.info, coverage/lcov.info, coverage/cobertura.xml, .coverage, htmlcov/
 ```
 
+Also discover and normalize mutation testing reports that were already produced by the target project's CI/local tooling:
+
+```bash
+# Look for mutation reports in configured paths first, then common locations:
+# .healthcheck/mutation/mutation-testing.json
+# .healthcheck/mutation/muter.json
+# mutation-report.json
+# reports/mutation*.json
+# build/reports/pitest/mutations.xml
+```
+
+Do **not** run mutation testing tools from the Tenet toolchain by default. Tools such as Muter can require Xcode schemes, simulators, warmed build artifacts, and long runtimes. Tenet ingests their reports; the target project owns execution.
+
 ### Step 4: Normalize Output
 
 For each tool that ran, normalize output to:
@@ -133,6 +155,32 @@ For each tool that ran, normalize output to:
 
 Write per-tool files to `.healthcheck/toolchain/{tool}.json`.
 Also save the raw output to `.healthcheck/toolchain/{tool}.raw.json`.
+
+For discovered mutation reports, write a normalized `.healthcheck/toolchain/mutation-testing.json`:
+
+```json
+{
+  "tool": "mutation-testing",
+  "provider": "muter",
+  "version": null,
+  "source_path": ".healthcheck/mutation/muter.json",
+  "scope": "changed_files",
+  "summary": {
+    "mutation_score_pct": 74.2,
+    "mutants_total": 132,
+    "mutants_killed": 98,
+    "mutants_survived": 28,
+    "mutants_timed_out": 6,
+    "mutants_equivalent": 0
+  },
+  "survivors_by_file": [
+    { "file": "Sources/App/AuthService.swift", "survived": 8, "total": 21 }
+  ],
+  "raw_path": ".healthcheck/toolchain/mutation-testing.raw.json"
+}
+```
+
+If a mutation report exists but cannot be parsed confidently, preserve the raw file and write `parse_error` plus `source_path` in the normalized output so `tenet-testing` can report it as informational.
 
 Line normalization rules:
 - `line` is always a 1-based source line number.
@@ -188,6 +236,8 @@ Write `.healthcheck/toolchain/_summary.json`:
 All output goes to `.healthcheck/toolchain/`:
 - `{tool}.json` — normalized findings per tool
 - `{tool}.raw.json` — raw tool output for debugging
+- `mutation-testing.json` — normalized mutation testing report, if one was discovered
+- `mutation-testing.raw.json` — raw mutation report, if one was discovered
 - `language-census.json` — LOC and language breakdown
 - `_summary.json` — what ran, what skipped, timing
 
@@ -195,6 +245,7 @@ All output goes to `.healthcheck/toolchain/`:
 
 - **Determinism:** Given the same commit and tool versions, output must be byte-identical (excluding timestamps in metadata)
 - **No LLM judgment:** This skill only runs tools and normalizes output. No scoring, no descriptions, no fix_prompts.
+- **Mutation report ingestion only:** Never execute mutation testing tools from the default toolchain. Only parse existing reports.
 - **Parallel execution:** Run tools concurrently where possible to minimize wall-clock time
 - **Respect .gitignore:** Never scan files excluded by .gitignore (use `git ls-files` as the file list source)
 - **Fail fast on required tools:** If a `"required"` tool is missing, fail immediately with an install command

@@ -169,13 +169,27 @@ release-ops = 1.0
 [dimensions]
 accessibility = "off"    # Disable a dimension entirely
 infra-cloud = "off"
+
+[testing.mutation]
+# Tenet ingests mutation reports; project CI/local scripts run the mutation tool.
+# off | informational | bonus
+mode = "informational"
+minimum_score = 70
+excellent_score = 85
+bonus_points = 2
+scope = "changed_files"
+report_paths = [
+  ".healthcheck/mutation/mutation-testing.json",
+  ".healthcheck/mutation/muter.json",
+  "mutation-report.json"
+]
 ```
 
 Run `/tenet-skills:tenet-toolchain-setup` to generate this file with sensible defaults for your project.
 
 ### Toolchain Tools
 
-Tenet integrates with these static analysis tools for deterministic, reproducible scoring:
+Tenet integrates with these static analysis tools and report providers for deterministic, reproducible scoring:
 
 | Tool | Dimensions | Install |
 |---|---|---|
@@ -201,8 +215,11 @@ Tenet integrates with these static analysis tools for deterministic, reproducibl
 | tfsec | infra-cloud, security | `brew install tfsec` |
 | kube-linter | infra-cloud | `brew install kube-linter` |
 | conftest | infra-cloud, build-ci | `brew install conftest` |
+| Muter | testing mutation report ingestion (Swift) | `brew install muter-mutation-testing/formulae/muter` |
 
 When a tool is missing but set to `"auto"`, the corresponding skill falls back to heuristic analysis. When set to `"required"`, the run fails with an install command.
+
+Mutation testing is handled as a testing signal, not a standalone dimension. In Phase 1 (`mode = "informational"`), Tenet parses reports from tools such as Muter and shows score/survivor metrics without changing the health score. In Phase 2 (`mode = "bonus"`), a strong mutation score can add a small configurable bonus to the Testing dimension; missing or weak mutation results do not subtract points.
 
 ## Scoring
 

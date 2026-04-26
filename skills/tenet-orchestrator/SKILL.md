@@ -156,6 +156,30 @@ Read all dimension reports and aggregate into the final payload matching the sch
 }
 ```
 
+Mutation testing is not a separate dimension. Preserve standardized mutation metrics from `.healthcheck/reports/testing.json` under the testing dimension's `metrics` object so the dashboard can render a dedicated mutation card or graph without changing composite-score semantics:
+
+```json
+{
+  "key": "testing",
+  "metrics": {
+    "mutation_available": true,
+    "mutation_provider": "muter",
+    "mutation_scoring_mode": "informational",
+    "mutation_score_pct": 74.2,
+    "mutation_rating": "good",
+    "mutation_mutants_total": 132,
+    "mutation_mutants_killed": 98,
+    "mutation_mutants_survived": 28,
+    "mutation_bonus_applied": 0
+  }
+}
+```
+
+Phase behavior:
+- **Phase 1:** mutation metrics and `info` findings are surfaced in the testing dimension, but they do not affect the testing score or composite score.
+- **Phase 2:** when `[testing.mutation].mode = "bonus"`, `tenet-testing` may include a small positive `mutation_bonus_applied`; the orchestrator uses the already-computed testing score and does not apply any additional mutation math.
+- Missing mutation data never creates a top-level score penalty during Phase 1 or Phase 2.
+
 Before writing or uploading `final-report.json`, validate every finding against the shared fix prompt contract:
 
 - `fix_prompt` must contain a `## Location` section.
@@ -244,9 +268,12 @@ Dashboard upload skipped — set these environment variables to enable:
 ╰─────────────────┴───────┴───────┴────────────────────────────────╯
 
 Toolchain: semgrep ✓  gitleaks ✓  eslint ✓  npm_audit ✓  (4/6 tools ran)
+Mutation: muter 74.2% good (98/132 killed, 28 survived)  mode=informational
 Report: .healthcheck/reports/final-report.json
 Dashboard: http://localhost:8787/projects/my-project
 ```
+
+Only print the Mutation line when the testing dimension includes `metrics.mutation_available = true`. If mutation mode is configured but no report is available, print a compact note such as `Mutation: no report found (informational)`.
 
 Delta is computed by comparing against `.healthcheck/reports/previous-report.json` if it exists. Before writing the new final report, copy the current one to `previous-report.json`.
 
@@ -263,6 +290,7 @@ Delta is computed by comparing against `.healthcheck/reports/previous-report.jso
 - Specialist skills are invoked via the Skill tool, not by reading their SKILL.md directly
 - The composite score is the weighted average of all applicable dimension scores
 - Scoring math is pure — no LLM judgment in arithmetic
+- Mutation testing belongs under the `testing` dimension, not as its own dimension. The orchestrator preserves mutation metrics for dashboard visualization and never applies a penalty for missing mutation data.
 - If a specialist skill fails, log the error, mark that dimension as `applicable: false` with a note, and continue
 - NEVER upload a finding whose `fix_prompt` is missing a `## Location` block with `- File:`, `- Line:`, and `- Dimension:` entries.
 - NEVER invent source line numbers while normalizing malformed `fix_prompt`s. Use the finding's top-level `line` value exactly, or `N/A` when it is `null`.
