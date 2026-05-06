@@ -1,7 +1,7 @@
 ---
 name: tenet-orchestrator
 description: "Runs the full Tenet audit, coordinates dimensions, builds the report, and uploads to dashboard."
-when_to_use: "Run a Tenet audit, healthcheck, health check, project audit, code quality audit, run tenet, tenet report"
+when_to_use: "Run a Tenet audit, healthcheck, project audit, code quality audit, run tenet, tenet report"
 disable-model-invocation: true
 model: opus
 allowed-tools: Bash Read Write Glob Grep Skill Agent

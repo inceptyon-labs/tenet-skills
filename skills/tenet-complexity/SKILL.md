@@ -1,7 +1,7 @@
 ---
 name: tenet-complexity
 description: "Measures function/file complexity, nesting, length, and maintainability thresholds."
-when_to_use: "Complexity audit, cyclomatic complexity, function length, nesting depth, code complexity, tenet complexity"
+when_to_use: "Complexity audit, cyclomatic complexity, function length, nesting depth, tenet complexity"
 model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
