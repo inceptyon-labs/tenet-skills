@@ -104,6 +104,18 @@ If `.healthcheck/toolchain/markdownlint.json` exists, parse findings that apply 
 - `MD040` (fenced code without language) → minor
 - All others → info
 
+**1e. Check for a security policy:**
+
+Look for a security policy that tells users how to report vulnerabilities privately:
+
+```bash
+ls SECURITY.md .github/SECURITY.md docs/SECURITY.md SECURITY.rst SECURITY.txt 2>/dev/null
+```
+
+GitHub recognizes `SECURITY.md` in the project root, `.github/`, or `docs/`. If none is found:
+- Public / published projects (has a LICENSE, a git remote, or publishes packages): **minor** — "No SECURITY.md; the vulnerability reporting process is undocumented"
+- Private / internal projects: **info**
+
 ### Step 2: Inline Documentation Coverage
 
 **2a. Identify public API surface:**
@@ -235,6 +247,7 @@ Write the dimension report to `.healthcheck/reports/docs.json`:
     "readme_present": true,
     "readme_sections_found": ["overview", "setup", "usage"],
     "readme_sections_missing": ["deployment", "contributing"],
+    "security_policy_present": false,
     "inline_doc_coverage_pct": 62,
     "total_public_symbols": 84,
     "documented_public_symbols": 52,
@@ -261,6 +274,55 @@ Write the dimension report to `.healthcheck/reports/docs.json`:
 - **All findings must include a `fix_prompt`** following the template in `shared/fix_prompt_template.md`
 
 ## fix_prompt Examples
+
+### Example 0: Missing Security Policy
+
+**Finding:** Public project has no SECURITY.md (minor)
+
+```
+# Fix: Add a SECURITY.md so vulnerabilities can be reported privately
+
+## Context
+This is a public repository with no security policy. Researchers who find a
+vulnerability have no documented private channel and may disclose it publicly.
+
+## Location
+- File: SECURITY.md (to create — root or .github/)
+- Line: N/A
+- Dimension: docs / minor
+
+## Current behavior
+No SECURITY.md exists in the root, .github/, or docs/.
+
+## Required change
+Create `SECURITY.md` in the repository root (or `.github/SECURITY.md`) with:
+1. **Supported Versions** — a short table of which versions receive security fixes.
+2. **Reporting a Vulnerability** — a private channel (GitHub private vulnerability
+   reporting, a security email, or a Security Advisory link) and expected response time.
+3. What to include in a report and the disclosure expectations.
+
+Example skeleton:
+```markdown
+# Security Policy
+
+## Supported Versions
+| Version | Supported |
+|---------|-----------|
+| latest  | ✅        |
+
+## Reporting a Vulnerability
+Please report security issues privately via GitHub's "Report a vulnerability"
+button (Security tab) or email security@example.com. We aim to respond within 72 hours.
+```
+
+## Constraints
+- Do not disclose any existing unpatched vulnerabilities in the file itself.
+- Use a real, monitored reporting channel.
+
+## Verification
+- `ls SECURITY.md .github/SECURITY.md docs/SECURITY.md` finds the file
+- The file names a working private reporting channel
+```
 
 ### Example 1: Missing README Sections
 

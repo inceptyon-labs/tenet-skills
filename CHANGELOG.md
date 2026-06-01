@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Mutation testing report ingestion for the Testing dimension, including Phase 1 informational reporting and Phase 2 opt-in score bonus behavior.
 - Standard mutation metrics for dashboard drilldowns, including provider, scope, score, rating, killed/survived/timed-out counts, worst files, and bonus applied.
 - Toolchain/setup guidance for discovering mutation reports and optional Swift/Muter configuration without running mutation tools from Tenet by default.
+- Repo-hygiene trust signals (parity with GitHub Guard's Trust Report): `tenet-docs` now flags a missing `SECURITY.md` (DOCS-R012/R013); `tenet-supply-chain-license` now checks for an explicit LICENSE file/metadata and for unsigned recent commits; `tenet-security` now detects pipe-to-shell installers, package lifecycle hooks running arbitrary commands, and install scripts requiring elevated privileges (SEC-INSTALL-001..003).
 
 ## [1.0.0] - 2026-04-17
 

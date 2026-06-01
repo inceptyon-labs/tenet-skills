@@ -87,7 +87,7 @@ Run all available tools. For each tool, capture:
 |---|---|---|
 | semgrep | `semgrep --config=auto --json --quiet .` | security, errors |
 | gitleaks | `gitleaks detect --source=. --report-format=json --report-path=-` | secrets |
-| trufflehog | `trufflehog filesystem --json .` | secrets |
+| trufflehog | `trufflehog git file://. --json` | secrets |
 | npm audit | `npm audit --json 2>/dev/null` | dependencies |
 | pip-audit | `pip-audit -f json 2>/dev/null` | dependencies |
 | osv-scanner | `osv-scanner --format json -r .` | dependencies |
@@ -107,6 +107,13 @@ Run all available tools. For each tool, capture:
 | tfsec | `tfsec . --format json` | infra-cloud, security |
 | kube-linter | `kube-linter lint . --format json` | infra-cloud |
 | conftest | `conftest test --output json .` | infra-cloud, build-ci |
+
+> **Git-aware secret scanning:** gitleaks and trufflehog both run in git mode
+> (`--source=.` / `git file://.`) so they scan tracked content and history only.
+> Filesystem mode (`trufflehog filesystem .`) ignores `.gitignore` and floods
+> results with build artifacts (`.build/`, `dist/`, `node_modules/`), violating
+> the "Respect .gitignore" constraint below. If a target genuinely needs a
+> filesystem scan, pass `--exclude-paths` for the ignored directories.
 
 Also check for and parse coverage reports:
 ```bash

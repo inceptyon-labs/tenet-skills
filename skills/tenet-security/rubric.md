@@ -404,6 +404,31 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 
 ---
 
+## Install & Lifecycle Scripts
+
+### SEC-INSTALL-001: Pipe-to-Shell Installer
+
+- **Severity:** major
+- **Confidence:** heuristic
+- **Description:** Documentation or a script instructs users to pipe remote content directly into a shell (`curl ... | bash`, `wget -O- ... | sh`), executing unreviewed remote code — often as root.
+- **Detection:** Grep README/docs/scripts for `(curl|wget) ... | (sudo )?(ba)?sh`.
+
+### SEC-INSTALL-002: Lifecycle Hook Runs Arbitrary Command
+
+- **Severity:** major
+- **Confidence:** heuristic
+- **Description:** A package manifest `preinstall`/`install`/`postinstall`/`prepare` hook invokes a shell, `node -e`, or downloads and executes remote content. These run automatically on dependency install, giving the package RCE on every consumer's machine.
+- **Detection:** `package.json` lifecycle scripts containing `curl`, `wget`, `node -e`, `sh `, `bash `, or `sudo`. Exclude hooks that only run local in-repo build steps.
+
+### SEC-INSTALL-003: Install Script Requires Elevated Privileges
+
+- **Severity:** minor (major if combined with a remote download)
+- **Confidence:** heuristic
+- **Description:** An `install.sh`/`setup.sh`/`setup.py` uses `sudo`, `chmod +x` on downloaded artifacts, or writes to system paths, escalating a routine install into a privileged operation.
+- **Detection:** Grep install/setup scripts for `sudo`, `chmod +x`, `chown root`, `os.system`, or `subprocess(..., shell=True)`.
+
+---
+
 ## Outputs Validated
 
 | Artifact | Validation |

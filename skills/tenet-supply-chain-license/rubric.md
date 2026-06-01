@@ -14,8 +14,11 @@
 | GitHub Action or Docker base image not pinned in release CI | major | native |
 | No SBOM generation for deployable app/container | major | heuristic |
 | Unknown runtime dependency license | major | deterministic / native |
+| Public/distributed project has no LICENSE file or license metadata | minor | heuristic |
 | CI does not use frozen install | minor | native |
 | SBOM not archived as artifact | info | heuristic |
+| Recent commits are not cryptographically signed | info | heuristic |
+| Private/internal project has no LICENSE file | info | heuristic |
 
 ## Metrics
 
@@ -24,5 +27,7 @@
 - `unpinned_action_count`
 - `unpinned_image_count`
 - `unknown_license_count`
+- `license_file_present`
+- `signed_commit_ratio`
 - `sbom_present`
 - `scanner_findings_imported`

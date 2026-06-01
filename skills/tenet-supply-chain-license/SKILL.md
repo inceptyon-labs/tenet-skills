@@ -50,11 +50,16 @@ Check:
 - Docker base images pinned by digest
 - Package manager config for private scopes/registries
 - `npm publishConfig`, `.npmrc`, `pip.conf`, `poetry` sources for dependency confusion risk
+- Commit provenance: whether recent commits are cryptographically signed (GPG/SSH/Sigstore). Heuristic check:
+  ```bash
+  git log --pretty=%G? -n 20 | sort | uniq -c   # G/U = signed, N = unsigned
+  ```
 
 Severity:
 - `critical`: public registry can satisfy internal package names or private scope has no registry binding
 - `major`: Actions or Docker images use mutable major/version tags in protected CI
 - `minor`: tool versions are unpinned in CI but not on a release path
+- `info`: recent commits are unsigned, so commit authorship has no verifiable provenance
 
 ### Step 3: SBOM Coverage
 
@@ -69,11 +74,13 @@ Severity:
 
 Use available tool output first. Otherwise inspect package manifests for license metadata and known high-risk licenses.
 
+Also confirm the repository declares its own license — a `LICENSE`/`LICENSE.md`/`LICENCE`/`COPYING` file in the root, or a `license` field in the primary manifest (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.). Without one, reuse terms are legally undefined ("all rights reserved" by default).
+
 Severity:
 - `critical`: AGPL/GPL dependency appears in distributed proprietary product path without documented approval
 - `major`: unknown/missing licenses in runtime dependencies
-- `minor`: weak license metadata in dev-only dependencies
-- `info`: license policy file is missing
+- `minor`: weak license metadata in dev-only dependencies; or a public/distributed project (git remote, published package, or open-sourced) has no LICENSE file and no license metadata
+- `info`: license policy file is missing; or a private/internal project has no LICENSE file
 
 ### Step 5: Toolchain Vulnerability Signals
 

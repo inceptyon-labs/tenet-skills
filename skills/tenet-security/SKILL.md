@@ -278,7 +278,34 @@ grep -rnE 'cidr_blocks\s*=\s*\["0\.0\.0\.0/0"\]' --include="*.tf" .
 
 Combine with tflint findings for comprehensive IaC coverage.
 
-### Step 13: Score Calculation
+### Step 13: Scan for Unsafe Install & Lifecycle Scripts
+
+Repositories that tell users to pipe remote content into a shell, or that run arbitrary
+commands during package installation, hand every consumer a remote-code-execution path.
+These are supply-chain trust signals — flag them even when the rest of the codebase is clean.
+
+```bash
+# Pipe-to-shell install instructions in docs
+grep -rnE "(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba)?sh\b" --include="*.md" --include="*.mdx" --include="*.rst" .
+# Package manager lifecycle hooks that shell out or fetch remote content
+grep -rnE "\"(pre|post)?install\"\s*:\s*\"[^\"]*(curl|wget|node -e|sh |bash |sudo )" package.json
+# Install/setup shell scripts requiring elevated privileges
+grep -rnE "\bsudo\b|chmod\s+\+x|chown\s+root" --include="install.sh" --include="setup.sh" .
+# Python install scripts that execute a shell or escalate
+grep -rnE "os\.system|subprocess[^)]*shell\s*=\s*True|sudo" --include="setup.py" --include="install.py" .
+```
+
+Look for and flag:
+- **Pipe-to-shell installers** — `curl ... | bash`, `wget -O- ... | sh` in README/docs or scripts. The user executes unreviewed remote code, often as root → `major`.
+- **Lifecycle hooks running arbitrary commands** — `preinstall`/`install`/`postinstall`/`prepare` entries in `package.json` (or the equivalent in other ecosystems) that invoke a shell, `node -e`, or download-and-execute remote content. These run automatically on `npm install` → `major`.
+- **Install/setup scripts requiring elevated privileges** — `sudo`, `chmod +x` on downloaded artifacts, or writes to system paths inside `install.sh`/`setup.sh`/`setup.py` → `minor` (escalate to `major` if combined with a remote download).
+
+**Exclude safe patterns:**
+- Lifecycle hooks that only run local, in-repo build steps (`tsc`, `husky install`, `node ./scripts/build.js`) with no shell pipe or remote fetch.
+- Documented `curl`/`wget` used to *download* a file the user then inspects, not piped straight into a shell.
+- Scripts under test fixtures, examples, or vendored third-party directories.
+
+### Step 14: Score Calculation
 
 Apply the standard scoring formula from `shared/severity.md`:
 
@@ -289,7 +316,7 @@ score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's 
 
 Info findings do NOT affect the score.
 
-### Step 14: Write Report
+### Step 15: Write Report
 
 Write the dimension report to `.healthcheck/reports/security.json`:
 
@@ -352,6 +379,9 @@ Write the dimension report to `.healthcheck/reports/security.json`:
 | Public S3 bucket | `acl = "public-read"` | critical |
 | Security group 0.0.0.0/0 on sensitive port | Inbound from anywhere | critical |
 | Unencrypted storage | `encrypted = false` | major |
+| Pipe-to-shell installer | `curl ... \| bash` in docs/scripts | major |
+| Package lifecycle hook runs arbitrary command | `postinstall` shells out / fetches remote | major |
+| Install script requires elevated privileges | `sudo` / `chmod +x` in `install.sh` | minor |
 
 ## Confidence Tiers per Detection Method
 
@@ -539,4 +569,46 @@ app.use(cors({
 - Run: `grep -rn "origin.*\*" src/` and confirm zero results
 - Test: `curl -H "Origin: https://evil.com" -I http://localhost:3000/api/me` should NOT return `Access-Control-Allow-Origin: https://evil.com`
 - Test: `curl -H "Origin: http://localhost:3000" -I http://localhost:3000/api/me` should return `Access-Control-Allow-Origin: http://localhost:3000`
+```
+
+### Example 4: Pipe-to-Shell Installer
+
+```
+# Fix: README instructs users to pipe a remote script straight into a shell
+
+## Context
+The installation instructions tell users to run `curl https://example.com/install.sh | sudo bash`. This executes unreviewed remote code with root privileges; a compromise of the host (or a MITM) silently runs arbitrary commands on every user's machine.
+
+## Location
+- File: README.md
+- Line: 42
+- Dimension: security / major
+
+## Current behavior
+```bash
+curl -fsSL https://get.example.com/install.sh | sudo bash
+```
+
+## Required change
+1. Have users download the script first, then run it after inspection:
+   ```bash
+   curl -fsSL https://get.example.com/install.sh -o install.sh
+   # Review install.sh, then:
+   sh install.sh
+   ```
+2. Publish a checksum (and ideally a signature) so users can verify the script before running:
+   ```bash
+   curl -fsSL https://get.example.com/install.sh -o install.sh
+   echo "<sha256>  install.sh" | sha256sum -c
+   sh install.sh
+   ```
+3. Where possible, distribute via a package manager (Homebrew, apt, npm) instead of a curl-pipe installer, and avoid requiring `sudo` unless strictly necessary.
+
+## Constraints
+- Do not silently drop the install path users rely on — keep a working one-liner alternative documented as "quick (unverified) install" if you must.
+- Prefer removing the `sudo` requirement; only escalate for steps that genuinely need it.
+
+## Verification
+- `grep -nE "(curl|wget).*\| *(sudo )?(ba)?sh" README.md` returns no piped-to-shell instructions
+- The documented install flow downloads, verifies, then executes as separate steps
 ```

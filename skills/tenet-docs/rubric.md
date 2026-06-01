@@ -25,6 +25,8 @@ Info findings do NOT affect the score.
 | DOCS-R009 | markdownlint fenced code without language (MD040) in README | minor | deterministic |
 | DOCS-R010 | markdownlint multiple H1 headings (MD025) in README | minor | deterministic |
 | DOCS-R011 | Other markdownlint violations in README | info | deterministic |
+| DOCS-R012 | Public/published project has no SECURITY.md (root, `.github/`, or `docs/`) | minor | deterministic |
+| DOCS-R013 | Private/internal project has no SECURITY.md | info | deterministic |
 
 ### Inline Documentation Coverage
 
@@ -75,6 +77,7 @@ Info findings do NOT affect the score.
 | `readme_present` | boolean | Whether a README file exists |
 | `readme_sections_found` | string[] | Section keys matched in the README |
 | `readme_sections_missing` | string[] | Section keys not found in the README |
+| `security_policy_present` | boolean | Whether a SECURITY.md exists in root, `.github/`, or `docs/` |
 | `inline_doc_coverage_pct` | integer | Percentage of public symbols with docs |
 | `total_public_symbols` | integer | Count of exported/public symbols scanned |
 | `documented_public_symbols` | integer | Count of symbols with doc comments |
