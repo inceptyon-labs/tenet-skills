@@ -2,7 +2,7 @@
 name: tenet-database-migrations
 description: "Audits migration safety: destructive changes, indexes, rollbacks, transactions, locks, and backfills."
 when_to_use: "Database migration audit, schema review, migration safety, index check, rollback planning, data backfill, tenet database-migrations"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

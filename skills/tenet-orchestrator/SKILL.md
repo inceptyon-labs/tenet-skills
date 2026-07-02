@@ -81,6 +81,7 @@ Read `language-census.json` and `.healthcheck.toml` to determine which dimension
 | Dimension | Skip if... |
 |---|---|
 | security | Never skipped |
+| correctness | No application source code (docs/config/assets only) |
 | complexity | Never skipped |
 | solid | Never skipped |
 | performance | Never skipped |
@@ -111,6 +112,7 @@ Log which dimensions are skipped and why.
 For each applicable dimension, invoke the specialist skill:
 - `tenet-skills:tenet-security`
 - `tenet-skills:tenet-complexity`
+- `tenet-skills:tenet-correctness` (run after complexity — it uses `complexity.json` for path selection)
 - `tenet-skills:tenet-solid`
 - `tenet-skills:tenet-performance`
 - `tenet-skills:tenet-dependencies`
@@ -245,6 +247,7 @@ Apply dimension weights from `.healthcheck.toml` `[weights]` section, falling ba
 |---|---|
 | security | 1.5 |
 | secrets | 1.5 |
+| correctness | 1.3 |
 | privacy-data | 1.3 |
 | dependencies | 1.3 |
 | errors | 1.3 |

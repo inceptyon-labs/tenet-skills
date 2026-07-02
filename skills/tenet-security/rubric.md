@@ -83,6 +83,50 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 - **Confidence:** deterministic (semgrep) or heuristic (grep)
 - **Description:** User-controlled content is rendered as raw HTML without sanitization, enabling cross-site scripting attacks.
 - **Detection:** `dangerouslySetInnerHTML`, `v-html`, `innerHTML =`, Django `|safe`, Jinja2 `|raw` without prior sanitization.
+- **Do NOT flag:** DOMPurify/sanitizer-wrapped HTML, auto-escaped JSX text, static literals (see `shared/security-calibration.md`).
+
+### SEC-INJ-004: NoSQL / Object Injection
+
+- **Severity:** major
+- **Confidence:** heuristic
+- **Description:** A request object (`req.body`/`req.query`) is passed directly into a document-store query filter, allowing operator injection (e.g. `{ "$gt": "" }`) to bypass authentication or match unintended documents.
+- **Detection:** `.find/findOne/update/delete(req.body|req.query...)`, `$where`, user-controlled `$regex`.
+
+---
+
+## Broken Access Control
+
+The highest-frequency real-world API vulnerability class. These are **not** grep-shaped —
+they require the entry-point inventory (`shared/entry-points.md`) and reading each handler.
+
+### SEC-AUTHZ-IDOR: Missing Ownership Check (IDOR / BOLA)
+
+- **Severity:** critical
+- **Confidence:** native (must read the handler and its query)
+- **Description:** An authenticated route reads or mutates a record *by id* but the query is not scoped to the caller's user id. Any logged-in user can access another user's object by supplying its id. Parameterization does NOT fix this — the query is injection-safe but still missing the ownership predicate.
+- **Detection:** For each by-id route in the inventory, confirm the query includes an ownership predicate (`AND user_id = $caller`, `where: { id, userId }`). Absence is the finding.
+- **Do NOT flag:** queries already scoped to the caller, or admin routes with an explicit role gate that legitimately span users.
+
+### SEC-AUTHZ-TENANT: Multi-Tenant Isolation Gap
+
+- **Severity:** critical
+- **Confidence:** native
+- **Description:** In a multi-tenant application, a query on a tenant-scoped table omits the tenant predicate, leaking or letting one tenant mutate another tenant's data.
+- **Detection:** Detect tenancy first (a `tenant_id`/`org_id`/`league_id`/`account_id` column on domain tables). Then flag any query on a tenanted table lacking that scope. Global/reference tables are exempt.
+
+### SEC-AUTHZ-BFLA: Missing Function-Level Authorization
+
+- **Severity:** critical
+- **Confidence:** native or heuristic
+- **Description:** A privileged or administrative action is reachable by any authenticated user because it has no role/permission check.
+- **Detection:** Admin/management routes in the inventory with no role-checking middleware or guard.
+
+### SEC-AUTHZ-MASS: Mass Assignment
+
+- **Severity:** major (critical if a privilege field is assignable)
+- **Confidence:** heuristic or native
+- **Description:** A create/update spreads the entire request body into a model, letting a client set fields it should not control (`role`, `isAdmin`, `ownerId`, `verified`).
+- **Detection:** `.create/update/save({ ...req.body })`, `Model(**request.json)`. Check whether the model exposes a privilege field.
 - **Example fix_prompt:**
   ```
   # Fix: XSS via dangerouslySetInnerHTML
@@ -155,6 +199,20 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 - **Confidence:** heuristic
 - **Description:** Login, registration, or password reset endpoints lack rate limiting, enabling brute-force and credential stuffing attacks.
 - **Detection:** Auth route definitions without rate limiter middleware.
+
+### SEC-AUTH-007: Timing-Unsafe Secret Comparison
+
+- **Severity:** major
+- **Confidence:** heuristic or native
+- **Description:** A token, HMAC, signature, or reset code is compared with `===`/`==`/`.equals()`, leaking length/prefix information through timing and enabling secret recovery. Security comparisons must be constant-time.
+- **Detection:** `token/secret/signature/hmac/digest === ...`. Safe: `crypto.timingSafeEqual`, `hmac.compare_digest`, `MessageDigest.isEqual`.
+
+### SEC-AUTH-008: Webhook Signature Not Verified
+
+- **Severity:** major
+- **Confidence:** native
+- **Description:** A webhook receiver acts on the request payload without verifying the provider's signature (e.g. Stripe `Stripe-Signature`, GitHub `X-Hub-Signature-256`). An attacker can forge events (fake payments, fake CI results).
+- **Detection:** Webhook routes in the inventory that read `req.body` without a preceding `constructEvent`/HMAC verification against the raw body.
 
 ---
 
@@ -237,6 +295,31 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 - **Confidence:** heuristic
 - **Description:** `Marshal.load` on untrusted data allows arbitrary object instantiation.
 - **Detection:** `Marshal.load` with external input.
+
+### SEC-DESER-006: Prototype Pollution
+
+- **Severity:** major
+- **Confidence:** heuristic
+- **Description:** An attacker-controlled object is deep-merged/assigned into a target without guarding `__proto__`/`constructor`/`prototype`, corrupting `Object.prototype` and enabling DoS, property injection, or (with a gadget) RCE.
+- **Detection:** `merge/extend/defaultsDeep/set(target, req.body)` or recursive assign from `JSON.parse` of user input without key filtering.
+
+---
+
+## Parsing & Extraction
+
+### SEC-PARSE-001: ReDoS (Catastrophic Regex Backtracking)
+
+- **Severity:** minor–major (by endpoint criticality)
+- **Confidence:** heuristic
+- **Description:** A regular expression built from user input, or a static pattern with catastrophic backtracking (nested quantifiers) evaluated against user input, lets an attacker hang the event loop / worker with a crafted string.
+- **Detection:** `new RegExp(userInput)`, `re.compile(user)`, or patterns like `(a+)+`, `(.*a){n}` applied to request data.
+
+### SEC-PARSE-002: Zip-Slip / Tar Path Traversal
+
+- **Severity:** major
+- **Confidence:** heuristic or native
+- **Description:** Archive entries are extracted to a destination using the entry's own name without validating it stays under the target directory, so a `../` entry writes outside it (overwriting configs, code, or SSH keys).
+- **Detection:** Extraction loops (`zipEntry`, `tarfile.extractall`, `unzipper`) that join `entry.name`/`entry.path` to a base without a `path.resolve` prefix check.
 
 ---
 
@@ -426,6 +509,48 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 - **Confidence:** heuristic
 - **Description:** An `install.sh`/`setup.sh`/`setup.py` uses `sudo`, `chmod +x` on downloaded artifacts, or writes to system paths, escalating a routine install into a privileged operation.
 - **Detection:** Grep install/setup scripts for `sudo`, `chmod +x`, `chown root`, `os.system`, or `subprocess(..., shell=True)`.
+
+---
+
+## Platform-Specific
+
+Run the playbook matching the detected stack. Without these, desktop/mobile repos score
+falsely high because the generic web checks find nothing.
+
+### SEC-TAURI-001: Overly Broad Capability / Allowlist
+
+- **Severity:** major (critical for `shell: { all: true }` reachable from remote content)
+- **Confidence:** heuristic
+- **Description:** Tauri `allowlist`/capabilities grant broad `shell`, `fs`, or `http` scopes, `dangerousRemoteDomainIpcAccess` is enabled, or the updater has no `pubkey`, widening the sandbox-escape surface.
+- **Detection:** `tauri.conf.json` allowlist/capability scopes; `#[tauri::command]`s that act on a path/command argument without validation.
+
+### SEC-ELECTRON-001: Insecure Renderer Configuration
+
+- **Severity:** critical (`nodeIntegration:true` / `contextIsolation:false` / `webSecurity:false`), major (unvalidated IPC, `shell.openExternal` on user input)
+- **Confidence:** heuristic
+- **Description:** Renderer security is disabled or IPC channels act on renderer-supplied input, letting a compromised page reach Node/OS.
+- **Detection:** `webPreferences` flags; `ipcMain.on/handle` channels; `shell.openExternal`.
+
+### SEC-MOBILE-001: Insecure Storage / Transport (Flutter, iOS)
+
+- **Severity:** major (secrets in `SharedPreferences`/`UserDefaults`, cleartext HTTP, ATS disabled), critical (hardcoded secret, TLS validation disabled)
+- **Confidence:** heuristic
+- **Description:** Secrets/tokens stored in non-secure stores instead of Keychain/`flutter_secure_storage`, cleartext `http://` to app APIs, disabled TLS validation, or ATS `NSAllowsArbitraryLoads`.
+- **Detection:** Flutter `.dart` and iOS `.swift`/`Info.plist` playbook greps in the skill.
+
+### SEC-LLM-001: Prompt / Tool Injection into Execution
+
+- **Severity:** major (critical when the injected instruction can drive tool execution or code exec)
+- **Confidence:** native
+- **Description:** Untrusted content (web page, email, file, DB row) is concatenated into a prompt that then drives tool calls or code execution with no gate, letting the content hijack the agent.
+- **Detection:** Trace untrusted sources into prompt construction where the model output triggers a tool/exec.
+
+### SEC-LLM-002: Unmetered Model Spend
+
+- **Severity:** minor
+- **Confidence:** heuristic
+- **Description:** User-triggered model calls in a loop with no budget/rate/quota cap allow cost-exhaustion. (Surface, don't over-flag — some projects cap spend deliberately at the key.)
+- **Detection:** Model calls inside request-triggered loops without a cap.
 
 ---
 

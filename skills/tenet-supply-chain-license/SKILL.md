@@ -2,7 +2,7 @@
 name: tenet-supply-chain-license
 description: "Audits dependency provenance, lockfiles, action/image pinning, licenses, and supply-chain risk."
 when_to_use: "Supply chain audit, SBOM check, license compliance, provenance, dependency confusion, pinned actions, tenet supply-chain-license"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

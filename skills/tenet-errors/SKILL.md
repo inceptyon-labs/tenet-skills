@@ -2,7 +2,7 @@
 name: tenet-errors
 description: "Audits error handling: empty catches, swallowed async errors, inconsistent types, and missing timeouts."
 when_to_use: "Error handling audit, catch block review, unhandled rejection, error boundaries, tenet errors"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

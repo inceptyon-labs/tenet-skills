@@ -5,7 +5,7 @@
       "id": 0,
       "name": "security-secrets-scan",
       "prompt": "Run the tenet-security and tenet-secrets skills against this codebase. Scan for injection risks, hardcoded secrets, auth gaps, and CORS issues. Write findings to .healthcheck/reports/security.json and .healthcheck/reports/secrets.json following the Tenet report schema.",
-      "expected_output": "Two JSON files with scored findings — security should flag any eval/exec usage, SQL injection risks, CORS config; secrets should detect any hardcoded keys or .env patterns. Both must include fix_prompts for every finding.",
+      "expected_output": "Two JSON files with scored findings \u2014 security should flag any eval/exec usage, SQL injection risks, CORS config; secrets should detect any hardcoded keys or .env patterns. Both must include fix_prompts for every finding.",
       "skill_paths": [
         "skills/tenet-security/SKILL.md",
         "skills/tenet-secrets/SKILL.md"
@@ -16,7 +16,7 @@
     {
       "id": 1,
       "name": "complexity-solid-analysis",
-      "prompt": "Run the tenet-complexity and tenet-solid skills against this codebase. Measure cyclomatic complexity, function length, file length, and nesting depth. Then evaluate SOLID principle adherence — look for SRP violations, concrete dependencies in business logic, and fat interfaces. Write findings to .healthcheck/reports/complexity.json and .healthcheck/reports/solid.json.",
+      "prompt": "Run the tenet-complexity and tenet-solid skills against this codebase. Measure cyclomatic complexity, function length, file length, and nesting depth. Then evaluate SOLID principle adherence \u2014 look for SRP violations, concrete dependencies in business logic, and fat interfaces. Write findings to .healthcheck/reports/complexity.json and .healthcheck/reports/solid.json.",
       "expected_output": "Two JSON files. Complexity should flag functions with cyclomatic complexity >10, files >500 lines, functions >50 lines. SOLID should identify god classes or modules with mixed responsibilities. Both must use the scoring formula and include fix_prompts.",
       "skill_paths": [
         "skills/tenet-complexity/SKILL.md",
@@ -76,6 +76,28 @@
         "skills/tenet-infra-cloud/SKILL.md",
         "skills/tenet-database-migrations/SKILL.md",
         "skills/tenet-release-ops/SKILL.md"
+      ],
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 6,
+      "name": "correctness-logic-bugs",
+      "prompt": "Run the tenet-correctness skill against this codebase. Select a bounded review set from critical paths (auth, payments, data mutation), churn hotspots, and entry-point handlers, then read each unit and trace concrete inputs looking for logic bugs: off-by-one, inverted conditions, wrong-variable copy-paste, missing await, race conditions, null paths, and type-coercion errors. State a concrete failing input for every major/critical finding. Write findings to .healthcheck/reports/correctness.json following the Tenet report schema.",
+      "expected_output": "One JSON file. correctness.json must select a bounded review set (not the whole repo) and state which files were and were not reviewed in notes. Every major/critical finding must include a concrete 'input X -> wrong output Y' scenario, a snippet, and a fix_prompt. Must use the scoring formula and honor suppressions.",
+      "skill_paths": [
+        "skills/tenet-correctness/SKILL.md"
+      ],
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 7,
+      "name": "security-fixture-recall",
+      "prompt": "Run the tenet-security skill against the evals/fixtures/security-recall/ directory as the project root. Build the entry-point inventory, scan every vulnerability class, and run the mandatory verification pass. Write findings to .healthcheck/reports/security.json. Then score with: python3 evals/score-fixtures.py --expected evals/fixtures/security-recall/EXPECTED.json --report .healthcheck/reports/security.json",
+      "expected_output": "security.json plus a passing score run: recall >= 80% of the 20 planted vulnerabilities across all classes (SQL/command/XSS/NoSQL injection, IDOR, tenant isolation, mass assignment, path traversal, JWT alg-none, timing-unsafe compare, weak hashing, weak random, SSRF, CORS, unverified webhook, prototype pollution, zip-slip, default creds, unsafe yaml.load, mobile insecure storage) AND zero false positives on the 9 safe decoys (parameterized query, Drizzle sql tagged template, DOMPurify-wrapped HTML, execFile array, Math.random jitter, sha1 cache key, ownership-scoped query, publishable Stripe key, allowlisted SSRF).",
+      "skill_paths": [
+        "skills/tenet-security/SKILL.md"
       ],
       "files": [],
       "assertions": []

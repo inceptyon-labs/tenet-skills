@@ -218,6 +218,7 @@ tflint = "auto"
 [weights]
 security = 1.5
 secrets = 1.5
+correctness = 1.3
 privacy-data = 1.3
 dependencies = 1.3
 errors = 1.3
@@ -240,6 +241,20 @@ accessibility = 0.8
 # Set to "off" to disable a dimension entirely
 # security = "off"
 # accessibility = "off"
+
+[suppressions]
+# Accept a known finding so it stops re-appearing as critical every run. A suppressed finding
+# is demoted to `info` (no score impact) and recorded with its reason — never silently dropped.
+# See shared/suppressions.md. Inline `// tenet-ignore: <RULE-ID> <reason>` comments also work.
+#
+# Suppress a rule everywhere:  "RULE-ID" = "reason"
+# "SEC-DEFAULT-005" = "internal LAN-only tool, HTTP is intentional"
+#
+# Suppress a rule for a path glob:
+# [[suppressions.paths]]
+# rule = "secrets"
+# path = "config/dev-keys.ts"
+# reason = "quota-capped throwaway dev keys, rotated monthly"
 
 [testing.mutation]
 # Tenet ingests mutation reports; the target project CI/local scripts run mutation tools.

@@ -1,28 +1,53 @@
 ---
 name: tenet-security
-description: "Audits security vulnerabilities including injection, auth, validation, crypto, SSRF, CORS, and CSRF."
-when_to_use: "Security audit, vulnerability scan, injection check, auth review, OWASP check, tenet security"
-model: opus
+description: "Audits security vulnerabilities including injection, broken access control (IDOR, tenant isolation), auth, validation, crypto, SSRF, CORS, CSRF, and platform-specific risks."
+when_to_use: "Security audit, vulnerability scan, injection check, auth review, IDOR, OWASP check, tenet security"
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 
 # Tenet Security
 
-> Scans the codebase for security vulnerabilities across injection, authentication, authorization, cryptography, and configuration domains.
+> Scans the codebase for security vulnerabilities across injection, broken access control, authentication, cryptography, and configuration domains — and verifies each finding before reporting it.
 
 ## Purpose
 
-This skill evaluates the security posture of the codebase by combining deterministic toolchain signals (semgrep, tflint) with targeted pattern matching for dangerous APIs, insecure defaults, missing validation, and unsafe cryptographic practices. Every finding includes a self-contained `fix_prompt` following the template in `shared/fix_prompt_template.md`.
+This skill evaluates the security posture of the codebase by combining deterministic
+toolchain signals (semgrep, tflint) with **flow-aware analysis**: it builds a complete
+inventory of the application's entry points, traces whether untrusted input reaches dangerous
+sinks, and refutes each candidate before emitting it. Grep finds pattern-shaped bugs; the
+highest-impact real-world vulnerabilities (missing ownership checks, tenant leaks, broken
+authorization) are not pattern-shaped, so this skill enumerates and reads handlers rather than
+relying on grep alone. Every finding includes a self-contained `fix_prompt`.
+
+## How to run this audit — read first
+
+This skill is executed by a Sonnet-class model. Follow these shared protocols exactly; they
+are what turn a shallow grep pass into a real audit:
+
+- **`shared/scan-discipline.md`** — grep hygiene (use `git grep`, exclude vendored code,
+  triage before reading), anti-laziness rules (complete every step, enumerate don't sample),
+  the worklog, and systemic-finding grouping. **Every grep command below is illustrative** —
+  run it under these hygiene rules, never as a bare `grep -rn PATTERN .`.
+- **`shared/entry-points.md`** — how to build the entry-point/route inventory that drives the
+  access-control and validation checks (Steps 3, 5, 6, 8).
+- **`shared/verification.md`** — the mandatory refute pass every `major`/`critical` must
+  survive (Step 16). No finding ships from a grep count alone.
+- **`shared/security-calibration.md`** — flag / do-NOT-flag pairs per vulnerability class.
+  Check candidates against these to kill false positives.
+- **`shared/suppressions.md`** — honor `tenet-ignore` comments and `[suppressions]` config
+  (Step 17).
 
 ## Language Support Matrix
 
 ```yaml
 support:
   native: [typescript, javascript, python]
-  tree_sitter: [go, rust, java, ruby]
-  heuristic: [terraform, kotlin, swift, php, csharp, cpp, c, shell]
+  tree_sitter: [go, rust, java, ruby, swift, kotlin]
+  heuristic: [dart, terraform, php, csharp, cpp, c, shell]
   config-only: [yaml, json, dockerfile]
   skip: [markdown, css]
+platform_playbooks: [tauri, electron, flutter, ios-swift, llm-app]
 ```
 
 ## Toolchain Inputs
@@ -31,383 +56,401 @@ support:
 |---|---|---|
 | `.healthcheck/toolchain/semgrep.json` | No (degrade gracefully) | Primary signal for injection, auth, crypto findings |
 | `.healthcheck/toolchain/tflint.json` | No (only if terraform present) | IaC security misconfigurations |
-| `.healthcheck/toolchain/language-census.json` | Yes | Determines which language-specific scans to run |
+| `.healthcheck/toolchain/language-census.json` | Yes | Determines which language-specific scans and playbooks to run |
 
-If `semgrep.json` is missing, log a warning and proceed with grep-based analysis only. Set `confidence: "heuristic"` on all findings produced without semgrep backing.
+If `semgrep.json` is missing, log a warning and proceed with grep + read analysis only. Set
+`confidence: "heuristic"` on findings produced without semgrep backing (unless you fully
+traced the flow by reading code, in which case `native` is honest).
 
-If `tflint.json` is missing and terraform files exist in the census, log that terraform security checks are limited to heuristic patterns.
+If `tflint.json` is missing and terraform files exist, note that terraform checks are limited
+to heuristic patterns.
 
 ## Procedure
 
-### Step 1: Load Toolchain Data
+### Step 1: Load Toolchain Data, Suppressions, and Start the Worklog
 
 ```bash
-# Read semgrep findings if available
 SEMGREP=".healthcheck/toolchain/semgrep.json"
-if [ -f "$SEMGREP" ]; then
-  SEMGREP_FINDINGS=$(jq '.findings' "$SEMGREP")
-else
-  echo "WARN: semgrep.json not found — proceeding with heuristic-only security scan"
-  SEMGREP_FINDINGS="[]"
-fi
+[ -f "$SEMGREP" ] && SEMGREP_FINDINGS=$(jq '.findings' "$SEMGREP") || { echo "WARN: semgrep.json not found — heuristic-only"; SEMGREP_FINDINGS="[]"; }
 
-# Read tflint findings if available
 TFLINT=".healthcheck/toolchain/tflint.json"
-if [ -f "$TFLINT" ]; then
-  TFLINT_FINDINGS=$(jq '.findings' "$TFLINT")
-else
-  TFLINT_FINDINGS="[]"
-fi
+[ -f "$TFLINT" ] && TFLINT_FINDINGS=$(jq '.findings' "$TFLINT") || TFLINT_FINDINGS="[]"
 
-# Read language census
 CENSUS=".healthcheck/toolchain/language-census.json"
-if [ ! -f "$CENSUS" ]; then
-  echo "ERROR: language-census.json is missing — cannot determine scan scope"
-  exit 1
-fi
+[ -f "$CENSUS" ] || { echo "ERROR: language-census.json missing — cannot scope scan"; exit 1; }
+
+mkdir -p .healthcheck/tmp
 ```
+
+Create `.healthcheck/tmp/security-worklog.md` per `shared/scan-discipline.md` and load
+`[suppressions]` from `.healthcheck.toml` (see `shared/suppressions.md`). Append every
+candidate finding to the worklog as you go.
 
 ### Step 2: Ingest Semgrep Findings
 
 For each semgrep finding with `category: "security"`:
-1. Map the semgrep severity to Tenet severity:
-   - `error` → `critical`
-   - `warning` → `major`
-   - `info` → `minor`
-2. Map the semgrep `rule_id` to a Tenet finding type (see Rubric below)
-3. Generate a `fix_prompt` from the finding details
-4. Set `confidence: "deterministic"`
+1. Map severity: `error` → `critical`, `warning` → `major`, `info` → `minor`.
+2. Map `rule_id` to a Tenet finding type (see Rubric).
+3. Set `confidence: "deterministic"` and generate a `fix_prompt`.
 
-### Step 3: Scan for Injection Risks
+### Step 3: Build the Entry-Point Inventory
 
-Grep for dangerous patterns. For each match, verify it is not inside a test file, comment, or known-safe wrapper before emitting a finding.
+**This is the most important step. Do not skip or sample it.** Follow `shared/entry-points.md`
+to enumerate every HTTP route, server action, resolver, queue/event consumer, cron job, and
+webhook receiver, using the recipe for the detected framework (Express, Hono, tRPC, Next.js,
+SvelteKit, FastAPI, Flask, Django, Go, etc.).
 
-#### SQL Injection
+Write the complete table to `.healthcheck/tmp/entry-points.md` with a row per entry point and
+columns: `method | path | file:line | auth? | role/authz? | ownership/tenant scope? | input validation? | mutates data?`.
 
-```bash
-# String concatenation in SQL queries
-grep -rnE "(query|execute|raw)\s*\(\s*['\`\"].*\+.*\$" --include="*.ts" --include="*.js" --include="*.py" .
-grep -rnE "f['\"].*SELECT.*\{" --include="*.py" .
-grep -rnE "format!.*SELECT.*\{" --include="*.rs" .
-```
+Fill in **every cell** by reading each handler. This table drives Steps 5, 6, and 8. Emit a
+`checks` entry summarizing coverage (e.g. "Audited 34 routes; 3 missing auth, 2 missing
+ownership scope, 5 missing validation").
 
-Look for:
-- String concatenation in SQL: `query("SELECT * FROM " + table)`, `db.raw(\`...${userInput}\`)`
-- Template literals with user input in SQL context
-- Python f-strings or `.format()` in SQL
-- Rust `format!` macros in SQL
-- Any ORM `.raw()` or `.execute()` with interpolated strings
+### Step 4: Injection
 
-**Exclude safe patterns:** Parameterized queries (`$1`, `?`, `:param`), query builders, migrations, seed files.
-
-#### Command Injection
+Run these under `git grep` hygiene; verify each match against `shared/security-calibration.md`
+before treating it as a finding.
 
 ```bash
-# Direct shell execution with user input
-grep -rnE "(exec|execSync|spawn|child_process|subprocess|os\.system|os\.popen|Runtime\.exec)" --include="*.ts" --include="*.js" --include="*.py" --include="*.java" .
-grep -rnE "eval\s*\(" --include="*.ts" --include="*.js" --include="*.py" .
+# SQL — string concat / interpolation in query context
+git grep -nE "(query|execute|raw)\s*\(\s*[\`'\"].*(\+|\$\{)" -- '*.ts' '*.js' '*.py'
+git grep -nE "f[\"'].*(SELECT|INSERT|UPDATE|DELETE).*\{" -- '*.py'
+git grep -nE "format!.*(SELECT|INSERT|UPDATE|DELETE)" -- '*.rs'
+# Command / eval
+git grep -nE "(child_process|exec|execSync|spawn|os\.system|os\.popen|subprocess|Runtime\.exec)" -- '*.ts' '*.js' '*.py' '*.java'
+git grep -nE "\beval\s*\(|new Function\s*\(" -- '*.ts' '*.js' '*.py'
+# XSS
+git grep -nE "dangerouslySetInnerHTML|v-html|innerHTML\s*=|insertAdjacentHTML" -- '*.tsx' '*.jsx' '*.vue' '*.ts' '*.js'
+git grep -nE "\|safe|\|raw|mark_safe|SafeString" -- '*.py' '*.html'
+# NoSQL / object injection (Mongo, etc.)
+git grep -nE "\.(find|findOne|update|delete)(One|Many)?\s*\(\s*(req\.(body|query|params))" -- '*.ts' '*.js'
+git grep -nE "\$where|\$regex" -- '*.ts' '*.js'
 ```
 
-Look for:
-- `child_process.exec()` with string arguments (not array)
-- `subprocess.call(shell=True)` in Python
-- `os.system()`, `os.popen()` in Python
-- `eval()` with non-literal arguments in JS/TS/Python
-- `new Function()` with dynamic input in JS/TS
-- `Runtime.getRuntime().exec()` in Java with concatenated strings
+Classes: **SQL injection** (concat/interpolation, f-strings, `.raw()` — but NOT parameterized
+queries or the `sql`...`` tagged template, per calibration), **command injection** (shell
+strings, `shell=True`, `eval`/`new Function` on non-literal input — but NOT `execFile`/array
+form), **XSS** (raw HTML from user input without a sanitizer), **NoSQL/object injection**
+(passing `req.body`/`req.query` objects straight into a query filter → operator injection).
 
-#### XSS (Cross-Site Scripting)
+### Step 5: Broken Access Control
+
+Drive this from the entry-point table (Step 3). For **every** authenticated route:
+
+- **Missing authentication** — a mutating route with no auth gate that isn't public-by-design
+  → `major` (`critical` for admin/privileged).
+- **Missing authorization (BOLA/BFLA)** — a privileged/admin action with no role or permission
+  check → `critical`.
+- **IDOR — missing ownership check** — a route that reads or mutates a record *by id* where
+  the query is **not scoped to the caller's user id**. Parameterization does not fix this.
+  Confirm the query has an ownership predicate (`AND user_id = $caller`, `where: { ..., userId }`).
+  → `critical`. See `SEC-AUTHZ-IDOR` and the calibration pair.
+- **Multi-tenant isolation** — first detect whether the app is multi-tenant (a
+  `tenant_id`/`org_id`/`league_id`/`account_id` column on domain tables in the schema, Drizzle
+  models, or Prisma schema). If so, any query on a tenanted table missing the tenant predicate
+  is a cross-tenant data leak → `critical`. See `SEC-AUTHZ-TENANT`.
+- **Mass assignment** — a create/update that spreads the whole request body into a model,
+  allowing a client to set fields it shouldn't (`role`, `isAdmin`, `ownerId`):
+  ```bash
+  git grep -nE "\.(create|update|save|insert)\s*\(\s*(\{?\s*\.\.\.)?req\.body" -- '*.ts' '*.js'
+  git grep -nE "(create|update)\([^)]*\*\*(request|req)\.(json|data|POST)" -- '*.py'
+  ```
+  → `major` (`critical` if a privilege field is assignable).
+
+### Step 6: Input Validation & Path Traversal
+
+For each entry point with `input validation? = no` in the table:
+- Reads `req.body`/`query`/`params` (or framework equivalent) with no schema (zod, joi, yup,
+  pydantic, class-validator) and no manual checks → **missing validation** (`major`).
+- File-upload endpoint with no type/size limit (`multer`/`formidable`/`busboy` without
+  `fileFilter`/`limits`) → `major`.
+
+**Path traversal** — user input used to build a filesystem path or key:
+```bash
+git grep -nE "(readFile|writeFile|createReadStream|sendFile|path\.join|open|fs\.)" -- '*.ts' '*.js' '*.py' | git grep -nE "req\.(params|query|body)"
+```
+Flag `path.join(base, req.params.file)` / `open(user_path)` without a `path.resolve` +
+prefix/allowlist check or `..`/absolute-path rejection → `critical`. (`SEC-VAL-003`)
+
+### Step 7: Authentication Mechanics
 
 ```bash
-# Dangerous HTML rendering
-grep -rnE "dangerouslySetInnerHTML|v-html|innerHTML\s*=" --include="*.tsx" --include="*.jsx" --include="*.vue" --include="*.ts" --include="*.js" .
-grep -rnE "\|safe|\|raw|mark_safe|SafeString" --include="*.py" --include="*.html" .
+git grep -nE "algorithms?\s*:\s*\[?\s*['\"]?none|verify\s*:\s*false|verify=False" -- '*.ts' '*.js' '*.py'   # JWT alg none / verify off
+git grep -nE "httpOnly\s*:\s*false|secure\s*:\s*false|sameSite\s*:\s*['\"]?none" -- '*.ts' '*.js'          # weak session cookie
+git grep -nE "createHash\(['\"](md5|sha1)|hashlib\.(md5|sha1)|MessageDigest\.getInstance\(['\"](MD5|SHA-1)" -- '*.ts' '*.js' '*.py' '*.java'  # weak password hash
+git grep -nE "bcrypt.*(genSalt|hash)\(\s*[0-9]\b" -- '*.ts' '*.js'   # bcrypt cost < 10
+```
+Also flag: no rate limiting on `/login`, `/register`, `/reset` (no limiter middleware on auth
+routes) → `major`. **Timing-unsafe secret comparison** — a token/HMAC/signature compared with
+`===`/`==`/`.equals()` instead of `crypto.timingSafeEqual`/`hmac.compare_digest` → `major`
+(`SEC-AUTH-007`):
+```bash
+git grep -nE "(token|secret|signature|hmac|digest|hash)\s*={2,3}\s*" -- '*.ts' '*.js'
 ```
 
-Look for:
-- `dangerouslySetInnerHTML` in React without sanitization
-- `v-html` in Vue templates
-- Direct `innerHTML` assignment
-- Django `|safe` filter, `mark_safe()` on user input
-- Jinja2 `|safe` or `|raw` filters
-- Missing output encoding in server-rendered HTML
+### Step 8: CSRF
 
-### Step 4: Scan for Auth/Authz Gaps
+From the entry-point table: cookie-authenticated state-changing routes (POST/PUT/PATCH/DELETE)
+with no CSRF token/double-submit/origin check, and auth cookies without `SameSite`.
+Token-in-header APIs (Authorization: Bearer) are generally exempt. → `major` / `minor`.
 
-Look for:
-- Route handlers without auth middleware
-- Admin endpoints accessible without role checks
-- JWT verification skips (`verify: false`, `algorithms: ['none']`)
-- Session configuration issues (missing `secure`, `httpOnly`, `sameSite`)
-- Missing CSRF tokens on state-changing endpoints
-- Password hashing with weak algorithms (MD5, SHA1, plain bcrypt cost < 10)
+### Step 9: SSRF & Open Redirect
 
 ```bash
-# JWT misconfig
-grep -rnE "verify\s*:\s*false|algorithms\s*:\s*\[.*none" --include="*.ts" --include="*.js" --include="*.py" .
-# Session config issues
-grep -rnE "secure\s*:\s*false|httpOnly\s*:\s*false" --include="*.ts" --include="*.js" .
-# Missing auth on routes — check for route definitions without preceding auth middleware
+git grep -nE "(fetch|axios|got|request|urllib|http\.(get|request)|HttpClient|requests\.(get|post))\s*\(.*req\.(query|params|body)" -- '*.ts' '*.js' '*.py'
+git grep -nE "(redirect|Location)\s*\(?.*req\.(query|params|body)" -- '*.ts' '*.js'
+git grep -nE "redirect\(.*request\.(GET|POST|args)" -- '*.py'
 ```
+SSRF: user-controlled URL fetched server-side without an allowlist → `major` (`critical` if it
+can reach cloud metadata `169.254.169.254` or internal services). Open redirect: redirect
+target from user input without allowlist → `major`.
 
-For route handler analysis:
-1. Identify the framework (Express, Fastify, Django, Flask, Gin, etc.)
-2. List all route definitions
-3. Check for auth middleware at the app/router level or per-route
-4. Flag any non-GET routes without auth middleware as `major`
-5. Flag admin/management routes without role-based checks as `critical`
-
-### Step 5: Scan for Insecure Defaults
+### Step 10: Cryptography
 
 ```bash
-# CORS wildcard
-grep -rnE "cors\(\s*\{?\s*origin\s*:\s*['\"]?\*|Access-Control-Allow-Origin.*\*" --include="*.ts" --include="*.js" --include="*.py" .
-# Debug mode in production configs
-grep -rnE "DEBUG\s*=\s*True|debug\s*:\s*true" --include="*.py" --include="*.ts" --include="*.js" --include="*.json" .
-# Default credentials
-grep -rnE "(password|passwd|secret)\s*[:=]\s*['\"]?(admin|password|123456|default|changeme)" --include="*.ts" --include="*.js" --include="*.py" --include="*.yaml" --include="*.json" .
+git grep -nE "ECB|AES/ECB|mode=ECB|\bDES\b|DESede|3DES" -- '*.ts' '*.js' '*.py' '*.java' '*.go'
+git grep -nE "iv\s*[:=]\s*(['\"][0-9a-fA-F]{16,}|Buffer\.from\()" -- '*.ts' '*.js'   # hardcoded IV
+git grep -nE "Math\.random|random\.random\(\)|\brand\(\)" -- '*.ts' '*.js' '*.py'      # weak PRNG
 ```
+ECB mode → `major`; DES/3DES → `major`; hardcoded IV → `major`; `Math.random()`/`random.random()`
+for a **security** value (token/id/nonce) → `major` (skip for jitter/shuffle — see
+calibration). MD5/SHA1 for passwords/tokens → `critical`; for checksums/cache keys → `info`.
 
-Look for:
-- `cors({ origin: '*' })` or `Access-Control-Allow-Origin: *` on credentialed endpoints
-- Debug mode enabled in production configuration
-- Default passwords or credentials in config files
-- Permissive CSP (`unsafe-inline`, `unsafe-eval`, `*`)
-- Missing rate limiting on auth endpoints
-- HTTP instead of HTTPS in production URLs
-- `allowJs: true` combined with `noImplicitAny: false` in tsconfig
-
-### Step 6: Scan for Unsafe Deserialization
+### Step 11: Unsafe Deserialization, ReDoS, Zip-Slip, Prototype Pollution
 
 ```bash
-# Unsafe deserialization
-grep -rnE "pickle\.loads?|yaml\.load\(|yaml\.unsafe_load|Marshal\.load|unserialize\(|JSON\.parse.*\beval\b|ObjectInputStream" --include="*.py" --include="*.rb" --include="*.php" --include="*.java" .
+git grep -nE "pickle\.loads?|yaml\.load\(|yaml\.unsafe_load|Marshal\.load|unserialize\(|ObjectInputStream" -- '*.py' '*.rb' '*.php' '*.java'
+git grep -nE "(new RegExp\(|re\.compile\().*(req\.|request\.|input)" -- '*.ts' '*.js' '*.py'   # user-supplied regex → ReDoS
+git grep -nE "(entry\.(path|name)|zipEntry|extractall|tarfile)" -- '*.ts' '*.js' '*.py'         # archive extraction → zip-slip
+git grep -nE "(merge|extend|defaultsDeep|set)\s*\(.*(req\.body|JSON\.parse)" -- '*.ts' '*.js'   # prototype pollution
 ```
+- **Unsafe deserialization** — pickle/`yaml.load`/`Marshal.load`/PHP `unserialize`/Java
+  `ObjectInputStream` on untrusted data → `major` (RCE class).
+- **ReDoS** — a regex built from user input, or a known catastrophic-backtracking pattern on
+  user input → `minor`/`major` depending on the endpoint.
+- **Zip-slip / tar traversal** — extracting archive entries to a path without validating the
+  entry name stays under the target dir → `major`.
+- **Prototype pollution** — deep-merging attacker-controlled objects into a target without
+  guarding `__proto__`/`constructor` → `major`.
 
-Look for:
-- Python `pickle.load()` / `pickle.loads()` on untrusted data
-- `yaml.load()` without `Loader=SafeLoader` in Python
-- `yaml.unsafe_load()` in Python
-- Ruby `Marshal.load` on untrusted data
-- PHP `unserialize()` on user input
-- Java `ObjectInputStream.readObject()` without type filtering
-
-### Step 7: Scan for Missing Input Validation
-
-Look for:
-- API endpoints that read `req.body`, `req.params`, `req.query` without validation (no zod, joi, yup, class-validator, or manual checks)
-- File upload endpoints without file type / size validation
-- Numeric inputs used without `parseInt` / `Number()` guards
-- URL parameters used directly in database queries or file paths
-
-For framework-aware analysis:
-1. Identify validation libraries in use (from `package.json`, `requirements.txt`, etc.)
-2. Check each route handler for validation middleware or inline validation
-3. Flag endpoints that consume user input without any validation layer
-
-### Step 8: Scan for Open Redirects
+### Step 12: Insecure Defaults, CORS, Headers, Webhooks
 
 ```bash
-# Redirect with user-controlled URL
-grep -rnE "redirect\(.*req\.(query|params|body)|res\.redirect\(.*req\.|Location.*req\." --include="*.ts" --include="*.js" .
-grep -rnE "redirect\(.*request\.(GET|POST|args)" --include="*.py" .
+git grep -nE "cors\(\s*\{?\s*origin\s*:\s*['\"]?\*|Access-Control-Allow-Origin.*\*" -- '*.ts' '*.js' '*.py'
+git grep -nE "origin\s*:\s*(req\.headers\.origin|true)" -- '*.ts' '*.js'   # origin reflection
+git grep -nE "DEBUG\s*=\s*True|debug\s*:\s*true" -- '*.py' '*.ts' '*.js' '*.json'
+git grep -nE "(password|passwd|secret)\s*[:=]\s*['\"]?(admin|password|123456|default|changeme)" -- '*.ts' '*.js' '*.py' '*.yaml' '*.json'
 ```
+Flag: CORS `origin:'*'` with `credentials:true` → `critical`; CORS wildcard/origin-reflection
+otherwise → `major`; debug mode in prod config → `major`; default creds → `critical`;
+permissive CSP (`unsafe-inline`/`unsafe-eval`/`*`) → `minor`; missing security headers
+(no helmet/HSTS/X-Frame-Options) → `minor`; HTTP in prod URLs → `minor`. **Webhook receiver
+that trusts the payload without verifying the provider signature** (Stripe/GitHub/etc.) →
+`major` (`SEC-WEBHOOK`).
 
-Look for:
-- `res.redirect(req.query.url)` without allowlist validation
-- `Location` header set from user input
-- Django/Flask redirect with user-controlled `next` parameter
-- Meta refresh tags with dynamic URLs
+### Step 13: IaC Security (Terraform)
 
-### Step 9: Scan for Unsafe Crypto
+If terraform files are present:
+```bash
+git grep -nE 'effect\s*=\s*"Allow".*actions\s*=\s*\["\*"\]|"Action":\s*"\*"' -- '*.tf'
+git grep -nE 'acl\s*=\s*"public-read|block_public_acls\s*=\s*false' -- '*.tf'
+git grep -nE 'encrypted\s*=\s*false|storage_encrypted\s*=\s*false' -- '*.tf'
+git grep -nE 'cidr_blocks\s*=\s*\["0\.0\.0\.0/0"\]' -- '*.tf'
+```
+Combine with tflint findings. Wildcard IAM → `critical`; public bucket → `critical`; SG open to
+0.0.0.0/0 on a sensitive port → `critical`; unencrypted storage → `major`.
+
+### Step 14: Unsafe Install & Lifecycle Scripts
 
 ```bash
-# Weak hashing for auth/secrets
-grep -rnE "createHash\(['\"]md5|createHash\(['\"]sha1|hashlib\.md5|hashlib\.sha1|MessageDigest\.getInstance\(['\"]MD5|MessageDigest\.getInstance\(['\"]SHA-1" --include="*.ts" --include="*.js" --include="*.py" --include="*.java" .
-# ECB mode
-grep -rnE "ECB|AES/ECB|mode=ECB|DES" --include="*.ts" --include="*.js" --include="*.py" --include="*.java" --include="*.go" .
-# Hardcoded IVs
-grep -rnE "iv\s*[:=]\s*['\"][0-9a-fA-F]{16,}|iv\s*[:=]\s*Buffer\.from\(" --include="*.ts" --include="*.js" .
-# Weak random for security
-grep -rnE "Math\.random|random\.random\(\)|rand\(\)" --include="*.ts" --include="*.js" --include="*.py" .
+git grep -nE "(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba)?sh\b" -- '*.md' '*.mdx' '*.rst'
+git grep -nE "\"(pre|post)?install\"\s*:\s*\"[^\"]*(curl|wget|node -e|sh |bash |sudo )" -- 'package.json'
+git grep -nE "\bsudo\b|chmod\s+\+x|chown\s+root" -- 'install.sh' 'setup.sh'
+git grep -nE "os\.system|subprocess[^)]*shell\s*=\s*True|sudo" -- 'setup.py' 'install.py'
 ```
+Pipe-to-shell installers → `major`; lifecycle hooks running arbitrary/remote commands →
+`major`; install scripts requiring elevated privileges → `minor` (escalate to `major` with a
+remote download). Exclude local build-only hooks (`tsc`, `husky install`) and documented
+download-then-inspect flows.
 
-Flag:
-- MD5/SHA1 used for password hashing or token generation → `critical`
-- MD5/SHA1 used for checksums/cache keys → `info` (not security-sensitive)
-- ECB block cipher mode → `major`
-- Hardcoded initialization vectors → `major`
-- DES or 3DES → `major`
-- `Math.random()` used for security tokens/IDs → `major`
-- `Math.random()` used for UI/non-security purposes → skip
+### Step 15: Platform Playbooks
 
-### Step 10: Scan for SSRF
+Run the playbook(s) matching the stack detected in the census. Each targets risks that the
+generic web checks miss — without these, a Tauri/Flutter/Swift repo scores falsely high.
 
+**Tauri (Rust + web):**
 ```bash
-# Server-side requests with user input
-grep -rnE "(fetch|axios|got|request|urllib|http\.get|http\.request|HttpClient)\s*\(.*req\.(query|params|body)" --include="*.ts" --include="*.js" --include="*.py" .
+git grep -nE "\"(shell|fs|http|all)\"\s*:\s*(true|\{)|\"scope\"|dangerousRemoteDomainIpcAccess|withGlobalTauri" -- 'tauri.conf.json' 'src-tauri/**/*.json'
+git grep -nE "#\[tauri::command\]|invoke_handler" -- 'src-tauri/**/*.rs'
 ```
+Flag: overly broad `allowlist`/capability scopes (`shell: { all: true }`, `fs` scope `**`),
+`dangerousRemoteDomainIpcAccess`, missing updater `pubkey`, `#[tauri::command]`s that take a
+path/command and act on it without validation → `major`.
 
-Look for:
-- HTTP client calls where the URL or hostname comes from user input
-- Missing URL validation / allowlist for outgoing requests
-- Internal service URLs constructable from user input
-
-### Step 11: Scan for CSRF
-
-Look for:
-- State-changing endpoints (POST/PUT/DELETE/PATCH) without CSRF middleware
-- Cookie-based auth without `sameSite` attribute
-- Missing CSRF token in forms
-- REST APIs relying on cookies without CSRF protection
-
-### Step 12: IaC Security (Terraform)
-
-If terraform files are present in the census:
-
+**Electron:**
 ```bash
-# Overly permissive IAM
-grep -rnE 'effect\s*=\s*"Allow".*actions\s*=\s*\["\*"\]|"Action":\s*"\*"' --include="*.tf" .
-# Public S3 buckets
-grep -rnE 'acl\s*=\s*"public-read|block_public_acls\s*=\s*false' --include="*.tf" .
-# Unencrypted storage
-grep -rnE 'encrypted\s*=\s*false|storage_encrypted\s*=\s*false' --include="*.tf" .
-# Security groups with 0.0.0.0/0
-grep -rnE 'cidr_blocks\s*=\s*\["0\.0\.0\.0/0"\]' --include="*.tf" .
+git grep -nE "nodeIntegration\s*:\s*true|contextIsolation\s*:\s*false|webSecurity\s*:\s*false|enableRemoteModule\s*:\s*true|allowRunningInsecureContent" -- '*.ts' '*.js'
+git grep -nE "shell\.openExternal\(|ipcMain\.(on|handle)\(" -- '*.ts' '*.js'
 ```
+Flag: `nodeIntegration:true` / `contextIsolation:false` / `webSecurity:false` → `critical`;
+`shell.openExternal` on user input → `major`; unvalidated IPC channels acting on renderer
+input → `major`; loading remote content into a privileged window → `major`.
 
-Combine with tflint findings for comprehensive IaC coverage.
-
-### Step 13: Scan for Unsafe Install & Lifecycle Scripts
-
-Repositories that tell users to pipe remote content into a shell, or that run arbitrary
-commands during package installation, hand every consumer a remote-code-execution path.
-These are supply-chain trust signals — flag them even when the rest of the codebase is clean.
-
+**Flutter / Dart:**
 ```bash
-# Pipe-to-shell install instructions in docs
-grep -rnE "(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba)?sh\b" --include="*.md" --include="*.mdx" --include="*.rst" .
-# Package manager lifecycle hooks that shell out or fetch remote content
-grep -rnE "\"(pre|post)?install\"\s*:\s*\"[^\"]*(curl|wget|node -e|sh |bash |sudo )" package.json
-# Install/setup shell scripts requiring elevated privileges
-grep -rnE "\bsudo\b|chmod\s+\+x|chown\s+root" --include="install.sh" --include="setup.sh" .
-# Python install scripts that execute a shell or escalate
-grep -rnE "os\.system|subprocess[^)]*shell\s*=\s*True|sudo" --include="setup.py" --include="install.py" .
+git grep -nE "SharedPreferences|http://|NSAllowsArbitraryLoads|badCertificateCallback|allowBadCertificates" -- '*.dart'
+git grep -nE "(apiKey|secret|token|password)\s*=\s*['\"][^'\"]{12,}" -- '*.dart'
 ```
+Flag: secrets/tokens in source or `shared_preferences` (use `flutter_secure_storage`) →
+`major`/`critical`; cleartext `http://` to app APIs → `major`; disabled TLS validation
+(`badCertificateCallback => true`) → `critical`; no certificate pinning on sensitive APIs →
+`minor`.
 
-Look for and flag:
-- **Pipe-to-shell installers** — `curl ... | bash`, `wget -O- ... | sh` in README/docs or scripts. The user executes unreviewed remote code, often as root → `major`.
-- **Lifecycle hooks running arbitrary commands** — `preinstall`/`install`/`postinstall`/`prepare` entries in `package.json` (or the equivalent in other ecosystems) that invoke a shell, `node -e`, or download-and-execute remote content. These run automatically on `npm install` → `major`.
-- **Install/setup scripts requiring elevated privileges** — `sudo`, `chmod +x` on downloaded artifacts, or writes to system paths inside `install.sh`/`setup.sh`/`setup.py` → `minor` (escalate to `major` if combined with a remote download).
+**iOS / Swift:**
+```bash
+git grep -nE "NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads" -- '*.plist' 'Info.plist'
+git grep -nE "UserDefaults.*(token|password|secret|key)|kSecAttrAccessible" -- '*.swift'
+git grep -nE "(apiKey|secret|token)\s*=\s*\"[^\"]{12,}\"" -- '*.swift'
+```
+Flag: ATS disabled (`NSAllowsArbitraryLoads = true`) → `major`; secrets/tokens in
+`UserDefaults` instead of Keychain → `major`; hardcoded secrets → `critical`; overly permissive
+Keychain accessibility (`kSecAttrAccessibleAlways`) → `minor`; CloudKit public-DB write scopes
+on user data → `major`.
 
-**Exclude safe patterns:**
-- Lifecycle hooks that only run local, in-repo build steps (`tsc`, `husky install`, `node ./scripts/build.js`) with no shell pipe or remote fetch.
-- Documented `curl`/`wget` used to *download* a file the user then inspects, not piped straight into a shell.
-- Scripts under test fixtures, examples, or vendored third-party directories.
+**LLM apps (agent/MCP/tool-use surface — check when the census shows `@anthropic-ai`,
+`openai`, `langchain`, tool/function definitions):**
+- Prompt/tool-injection: untrusted content (web page, email, file, DB row) concatenated into a
+  prompt that then drives **tool execution or code exec** without a gate → `major`/`critical`.
+- Unmetered spend: model calls in a user-triggered loop with no cap/budget/rate limit →
+  `minor` (Jason caps LLM spend deliberately — surface, don't over-flag).
+- Secrets in prompts/logs: API keys or PII interpolated into prompts or logged → `major`.
 
-### Step 14: Score Calculation
+### Step 16: Verification Pass (MANDATORY)
 
-Apply the standard scoring formula from `shared/severity.md`:
+Before anything enters the report, run every candidate `major`/`critical` finding through
+`shared/verification.md`: read the actual code, capture the exact offending line into
+`snippet`, trace that untrusted input truly reaches the sink, and actively try to refute it
+using the pairs in `shared/security-calibration.md`. Drop or demote anything you cannot
+confirm. Set `confidence` honestly. A report where every critical is defensible line-by-line
+is the goal.
+
+### Step 17: Apply Suppressions
+
+Per `shared/suppressions.md`: for each surviving finding, check `tenet-ignore` comments at/above
+the line and `[suppressions]` in `.healthcheck.toml`. Matching findings are demoted to `info`
+with `Suppressed: <reason>` in the description and do not affect the score. Track
+`metrics.suppressed_count`.
+
+### Step 18: Score Calculation
 
 ```
 score = 100 - (5 * critical_count + 2 * major_count + 0.5 * minor_count)
-score = max(0, min(100, int(score + 0.5)))  # Arithmetic rounding, not banker's rounding
+score = max(0, min(100, int(score + 0.5)))
 ```
+Info findings (including suppressed) do NOT affect the score. Apply severity escalation
+triggers from `shared/severity.md` (critical path, systemic, whole-layer) during Steps 5–15.
 
-Info findings do NOT affect the score.
+### Step 19: Write Report
 
-### Step 15: Write Report
-
-Write the dimension report to `.healthcheck/reports/security.json`:
+Write to `.healthcheck/reports/security.json`:
 
 ```json
 {
   "key": "security",
   "score": 75,
   "weight": 1.5,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "applicable": true,
-  "notes": "Found 1 critical SQL injection, 3 major auth gaps, and 5 minor input validation issues across 47 TypeScript files. Semgrep corroborated 4 of 9 findings.",
+  "notes": "Audited 34 entry points and 47 TS files. Found 1 critical IDOR (orders route unscoped), 1 SQL injection, 3 major auth gaps, and 5 minor validation issues. Semgrep corroborated 4 findings. 2 findings suppressed by config.",
   "metrics": {
     "files_scanned": 47,
+    "entry_points_audited": 34,
     "toolchain_signals": ["semgrep"],
-    "confidence_breakdown": {
-      "deterministic": 4,
-      "native": 3,
-      "heuristic": 2
-    },
-    "category_breakdown": {
-      "injection": 1,
-      "auth": 3,
-      "crypto": 2,
-      "validation": 5,
-      "config": 1
-    }
+    "suppressed_count": 2,
+    "confidence_breakdown": { "deterministic": 4, "native": 3, "heuristic": 2 },
+    "category_breakdown": { "injection": 1, "access_control": 2, "auth": 3, "crypto": 2, "validation": 5, "config": 1 }
   },
+  "checks": [
+    { "name": "Entry-point auth coverage", "status": "failed", "count": 3, "description": "3 of 34 routes missing auth" },
+    { "name": "Ownership/tenant scoping", "status": "failed", "count": 2, "description": "2 routes fetch records by id without owner scope" }
+  ],
   "findings": [ ... ]
 }
 ```
+
+Then delete `.healthcheck/tmp/security-*.md` and `.healthcheck/tmp/entry-points.md` scratch files.
 
 ## Finding Severity Guide
 
 | Category | Pattern | Default Severity |
 |---|---|---|
 | SQL injection (confirmed) | User input in raw SQL | critical |
-| Command injection (confirmed) | User input in exec/eval | critical |
-| XSS (confirmed) | User input in dangerouslySetInnerHTML | critical |
-| Missing auth on admin route | No middleware on /admin/* | critical |
-| JWT alg:none accepted | `algorithms: ['none']` | critical |
-| Overly permissive IAM | `Action: *` with `Effect: Allow` | critical |
-| CORS wildcard on credentialed endpoint | `origin: '*'` with `credentials: true` | critical |
-| Open redirect (confirmed) | User input in redirect URL | major |
-| CORS wildcard (non-credentialed) | `origin: '*'` on public API | major |
-| Missing CSRF on state-changing endpoint | POST/PUT/DELETE without CSRF | major |
-| Unsafe deserialization | `pickle.load`, `yaml.load` | major |
-| ECB cipher mode | AES-ECB usage | major |
-| Hardcoded IV | Static initialization vector | major |
-| Math.random for security | Token/ID generation | major |
-| Missing input validation | No zod/joi on route handler | major |
-| Weak hashing for auth | MD5/SHA1 for passwords | critical |
-| Weak hashing for checksums | MD5/SHA1 for cache keys | info |
-| Missing rate limiting on auth | No rate limiter on /login | major |
-| SSRF potential | User-controlled URL in fetch | major |
-| Debug mode in production config | `DEBUG=True` in production | major |
-| Default credentials in config | `password: admin` | critical |
-| HTTP in production URL | Non-HTTPS in prod config | minor |
-| Permissive CSP | `unsafe-inline`, `unsafe-eval` | minor |
-| Missing security headers | No helmet/HSTS/X-Frame | minor |
-| Public S3 bucket | `acl = "public-read"` | critical |
-| Security group 0.0.0.0/0 on sensitive port | Inbound from anywhere | critical |
+| Command injection (confirmed) | User input in exec/eval shell string | critical |
+| XSS (confirmed) | User input in raw HTML, no sanitizer | critical |
+| NoSQL / object injection | `req.body` object into query filter | major |
+| Missing auth on admin route | No auth on privileged endpoint | critical |
+| Missing auth on standard mutation | No auth on POST/PUT/DELETE | major |
+| Missing authorization (BOLA/BFLA) | No role check on privileged action | critical |
+| IDOR — missing ownership check | Record by id, not scoped to caller | critical |
+| Multi-tenant isolation gap | Tenanted table query missing tenant scope | critical |
+| Mass assignment | Whole req.body spread into model | major (critical if privilege field) |
+| Path traversal | User input in filesystem path | critical |
+| Missing input validation | No schema on route input | major |
+| Missing file-upload validation | No type/size limit | major |
+| JWT alg:none / verify:false | Token forgery | critical |
+| Weak password hashing (MD5/SHA1) | Fast hash for passwords | critical |
+| bcrypt cost < 10 | Weak work factor | major |
+| Missing rate limiting on auth | No limiter on /login | major |
+| Timing-unsafe secret compare | `===` on token/HMAC | major |
+| Missing CSRF on state change | Cookie auth, no CSRF | major |
+| SSRF | User-controlled server-side URL | major (critical if metadata reachable) |
+| Open redirect | User input in redirect target | major |
+| Unsafe deserialization | pickle/yaml.load/Marshal/unserialize | major |
+| ReDoS | User-controlled/catastrophic regex | minor–major |
+| Zip-slip / tar traversal | Unvalidated archive entry path | major |
+| Prototype pollution | Deep merge of attacker object | major |
+| ECB / DES / hardcoded IV | Broken crypto primitive | major |
+| Math.random for security | Token/ID/nonce generation | major |
+| CORS wildcard + credentials | `origin:'*'` + `credentials:true` | critical |
+| CORS wildcard / origin reflection | Any origin allowed | major |
+| Webhook signature not verified | Trusts unverified payload | major |
+| Debug mode in prod | `DEBUG=True` | major |
+| Default credentials | `password: admin` | critical |
+| Permissive CSP / missing headers / HTTP in prod | Config hardening gaps | minor |
+| Overly permissive IAM / public bucket / SG 0.0.0.0/0 | IaC exposure | critical |
 | Unencrypted storage | `encrypted = false` | major |
-| Pipe-to-shell installer | `curl ... \| bash` in docs/scripts | major |
-| Package lifecycle hook runs arbitrary command | `postinstall` shells out / fetches remote | major |
-| Install script requires elevated privileges | `sudo` / `chmod +x` in `install.sh` | minor |
+| Tauri broad allowlist / Electron nodeIntegration | Desktop sandbox escape | major–critical |
+| Flutter/Swift secret in storage / TLS disabled | Mobile data exposure | major–critical |
+| Prompt/tool injection into exec | LLM agent RCE path | major–critical |
+| Pipe-to-shell installer / lifecycle RCE | Supply-chain trust | major |
 
 ## Confidence Tiers per Detection Method
 
 | Method | Confidence |
 |---|---|
-| Semgrep match | `deterministic` |
-| tflint match | `deterministic` |
-| AST-based (native/tree_sitter) | `native` or `tree_sitter` |
-| Grep pattern match | `heuristic` |
-
-## Output
-
-- `.healthcheck/reports/security.json` — dimension report with all findings
+| Semgrep / tflint match | `deterministic` |
+| Read the code and traced flow end-to-end | `native` |
+| AST query (tree_sitter langs) | `tree_sitter` |
+| Grep pattern match, flow not fully traced | `heuristic` |
 
 ## Constraints
 
-- NEVER flag test files (`*.test.*`, `*.spec.*`, `__tests__/`, `test/`) at the same severity as production code. Demote test-only findings by one severity level.
-- NEVER flag code inside comments as a finding.
-- NEVER flag known-safe wrappers (e.g., parameterized query functions, sanitizer libraries) as vulnerable.
-- ALWAYS verify that `Math.random` / `random.random` is used in a security-sensitive context before flagging.
-- ALWAYS check if `dangerouslySetInnerHTML` input passes through DOMPurify or similar sanitizer before flagging.
-- ALWAYS include the exact file path and line number in findings.
+- ALWAYS complete every step (see `shared/scan-discipline.md`) — under-scanning yields a
+  falsely high score. Enumerate entry points fully; do not sample.
+- NEVER emit a `major`/`critical` finding without running it through the Step 16 verification
+  pass and quoting the offending line into `snippet`.
+- NEVER flag test files (`*.test.*`, `*.spec.*`, `__tests__/`, `test/`, fixtures, seeds) at the
+  same severity as production — demote one level or drop.
+- NEVER flag code inside comments; NEVER flag parameterized queries, the `sql`...`` tagged
+  template, DOMPurify-wrapped HTML, `execFile`/array-form exec, or non-security `Math.random`
+  (see `shared/security-calibration.md`).
+- ALWAYS honor `tenet-ignore` comments and `[suppressions]` config (Step 17).
+- Remember parameterization does NOT fix IDOR — check for the ownership predicate separately.
+- Group systemic findings (same pattern 5+ files) into one finding and escalate per severity.md.
 - Scoring math is pure arithmetic — no LLM judgment in the formula.
-- Every finding MUST include a `fix_prompt` following the template in `shared/fix_prompt_template.md`.
-- Grep-based findings MUST have `confidence: "heuristic"`.
-- If semgrep and grep both detect the same issue, use the semgrep finding (higher confidence) and drop the duplicate.
+- Every finding MUST include a `fix_prompt` following `shared/fix_prompt_template.md`.
+- If semgrep and grep detect the same issue, keep the semgrep finding and drop the duplicate.
 
 ## fix_prompt Examples
 
@@ -417,7 +460,8 @@ Write the dimension report to `.healthcheck/reports/security.json`:
 # Fix: SQL injection in user lookup query
 
 ## Context
-The `findUserByEmail` function builds a SQL query using string concatenation with user-supplied input, allowing SQL injection.
+The `findUserByEmail` function builds a SQL query using string concatenation with
+user-supplied input, allowing SQL injection.
 
 ## Location
 - File: src/db/users.ts
@@ -426,96 +470,80 @@ The `findUserByEmail` function builds a SQL query using string concatenation wit
 
 ## Current behavior
 ```typescript
-async function findUserByEmail(email: string) {
-  const result = await db.query(`SELECT * FROM users WHERE email = '${email}'`);
-  return result.rows[0];
-}
-```
-
-## Required change
-1. Replace the template literal with a parameterized query
-2. Use `$1` placeholder and pass `email` as a parameter array element
-
-Replace:
-```typescript
 const result = await db.query(`SELECT * FROM users WHERE email = '${email}'`);
 ```
 
-With:
+## Required change
+Replace the template literal with a parameterized query using a `$1` placeholder:
 ```typescript
 const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
 ```
 
 ## Constraints
-- Do not change the function signature
-- Do not change the return type
+- Do not change the function signature or return type
 - Preserve existing test behavior
 
 ## Verification
 - Run: `npm test -- --grep "findUserByEmail"`
-- Run: `grep -rn "template literal.*query\|query.*\\\`" src/db/` and confirm zero results
-- Verify the function still returns correct results with a valid email
+- Run: `git grep -nE "query\(\s*\`" src/db/` and confirm zero interpolated queries
 ```
 
-### Example 2: eval() Usage
+### Example 2: IDOR — Missing Ownership Check
 
 ```
-# Fix: Command injection via eval() in config parser
+# Fix: Any authenticated user can read any order (IDOR)
 
 ## Context
-The configuration parser uses `eval()` to process user-submitted configuration strings, allowing arbitrary code execution.
+The `GET /orders/:id` handler is authenticated but fetches the order by id only — it never
+checks the order belongs to the requesting user. Any logged-in user can read any other
+user's order by guessing or enumerating ids. The query is parameterized, so this is not SQL
+injection — it is a missing authorization (ownership) check.
 
 ## Location
-- File: src/config/parser.js
-- Line: 18
+- File: src/api/orders.ts
+- Line: 88
 - Dimension: security / critical
 
 ## Current behavior
-```javascript
-function parseConfig(input) {
-  const config = eval('(' + input + ')');
-  return config;
-}
+```typescript
+router.get('/orders/:id', requireAuth, async (req, res) => {
+  const order = await db.query('SELECT * FROM orders WHERE id = $1', [req.params.id]);
+  res.json({ data: order.rows[0] });
+});
 ```
 
 ## Required change
-1. Replace `eval()` with `JSON.parse()` for JSON input
-2. If the input format requires more than JSON, use a safe parser library (e.g., `json5` or `hjson`)
-3. Add input validation before parsing
-
-Replace:
-```javascript
-const config = eval('(' + input + ')');
-```
-
-With:
-```javascript
-let config;
-try {
-  config = JSON.parse(input);
-} catch (err) {
-  throw new Error(`Invalid configuration format: ${err.message}`);
-}
+Scope the query to the authenticated user (and/or their tenant), and return 404 (not 403) so
+you don't leak which ids exist:
+```typescript
+const order = await db.query(
+  'SELECT * FROM orders WHERE id = $1 AND user_id = $2',
+  [req.params.id, req.user.id]
+);
+if (!order.rows[0]) return res.status(404).json({ error: 'Not found' });
+res.json({ data: order.rows[0] });
 ```
 
 ## Constraints
-- Do not change the function signature
-- Ensure all existing callers that pass valid JSON still work
-- If any callers pass non-JSON (e.g., JS objects with unquoted keys), migrate those call sites to valid JSON
+- Apply the same ownership predicate to every by-id read/update/delete on this resource
+- If admins legitimately need cross-user access, gate that behind an explicit role check —
+  do not remove the ownership predicate for regular users
+- Preserve the response shape
 
 ## Verification
-- Run: `npm test`
-- Run: `grep -rn "eval(" src/` and confirm zero results outside of test files
-- Test with a sample config string to confirm parsing still works
+- Run: `npm test -- --grep "orders"`
+- Manually: log in as user A, request an order id owned by user B → expect 404
+- Audit siblings: `git grep -nE "WHERE id = \\$1" src/api/` and confirm each has an owner scope
 ```
 
-### Example 3: CORS Wildcard
+### Example 3: CORS Wildcard with Credentials
 
 ```
 # Fix: CORS wildcard allows any origin on authenticated API
 
 ## Context
-The Express CORS configuration uses `origin: '*'` while also enabling `credentials: true`, allowing any website to make authenticated cross-origin requests and steal user data.
+The Express CORS config uses `origin: '*'` with `credentials: true`, letting any website make
+authenticated cross-origin requests and steal user data.
 
 ## Location
 - File: src/server.ts
@@ -524,91 +552,26 @@ The Express CORS configuration uses `origin: '*'` while also enabling `credentia
 
 ## Current behavior
 ```typescript
-app.use(cors({
-  origin: '*',
-  credentials: true,
-}));
+app.use(cors({ origin: '*', credentials: true }));
 ```
 
 ## Required change
-1. Replace the wildcard origin with an explicit allowlist of trusted origins
-2. Read allowed origins from an environment variable for flexibility
-3. Keep `credentials: true` only for the allowlisted origins
-
-Replace:
+Replace the wildcard with an env-driven allowlist:
 ```typescript
+const ALLOWED = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
 app.use(cors({
-  origin: '*',
-  credentials: true,
-}));
-```
-
-With:
-```typescript
-const ALLOWED_ORIGINS = (process.env.CORS_ALLOWED_ORIGINS || 'http://localhost:3000').split(',');
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: (origin, cb) => cb(null, !origin || ALLOWED.includes(origin)),
   credentials: true,
 }));
 ```
 
 ## Constraints
-- Do not remove `credentials: true` if the frontend relies on cookie-based auth
-- Ensure the `CORS_ALLOWED_ORIGINS` env var is documented and set in deployment configs
-- Do not break local development — `http://localhost:3000` is the fallback
+- Keep `credentials: true` only for allowlisted origins
+- Document `CORS_ALLOWED_ORIGINS` and set it in deployment configs
+- Keep `http://localhost:3000` as the dev fallback
 
 ## Verification
-- Run: `npm test`
-- Run: `grep -rn "origin.*\*" src/` and confirm zero results
-- Test: `curl -H "Origin: https://evil.com" -I http://localhost:3000/api/me` should NOT return `Access-Control-Allow-Origin: https://evil.com`
-- Test: `curl -H "Origin: http://localhost:3000" -I http://localhost:3000/api/me` should return `Access-Control-Allow-Origin: http://localhost:3000`
-```
-
-### Example 4: Pipe-to-Shell Installer
-
-```
-# Fix: README instructs users to pipe a remote script straight into a shell
-
-## Context
-The installation instructions tell users to run `curl https://example.com/install.sh | sudo bash`. This executes unreviewed remote code with root privileges; a compromise of the host (or a MITM) silently runs arbitrary commands on every user's machine.
-
-## Location
-- File: README.md
-- Line: 42
-- Dimension: security / major
-
-## Current behavior
-```bash
-curl -fsSL https://get.example.com/install.sh | sudo bash
-```
-
-## Required change
-1. Have users download the script first, then run it after inspection:
-   ```bash
-   curl -fsSL https://get.example.com/install.sh -o install.sh
-   # Review install.sh, then:
-   sh install.sh
-   ```
-2. Publish a checksum (and ideally a signature) so users can verify the script before running:
-   ```bash
-   curl -fsSL https://get.example.com/install.sh -o install.sh
-   echo "<sha256>  install.sh" | sha256sum -c
-   sh install.sh
-   ```
-3. Where possible, distribute via a package manager (Homebrew, apt, npm) instead of a curl-pipe installer, and avoid requiring `sudo` unless strictly necessary.
-
-## Constraints
-- Do not silently drop the install path users rely on — keep a working one-liner alternative documented as "quick (unverified) install" if you must.
-- Prefer removing the `sudo` requirement; only escalate for steps that genuinely need it.
-
-## Verification
-- `grep -nE "(curl|wget).*\| *(sudo )?(ba)?sh" README.md` returns no piped-to-shell instructions
-- The documented install flow downloads, verifies, then executes as separate steps
+- `curl -H "Origin: https://evil.com" -I http://localhost:3000/api/me` must NOT return
+  `Access-Control-Allow-Origin: https://evil.com`
+- `curl -H "Origin: http://localhost:3000" -I http://localhost:3000/api/me` must return it
 ```

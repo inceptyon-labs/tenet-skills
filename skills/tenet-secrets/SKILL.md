@@ -2,7 +2,7 @@
 name: tenet-secrets
 description: "Scans committed files and history for hardcoded tokens, keys, passwords, and private secrets."
 when_to_use: "Secret scan, credential leak, API key check, token exposure, tenet secrets"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -12,7 +12,19 @@ allowed-tools: Bash Read Grep Glob Write
 
 ## Purpose
 
-This skill scans for hardcoded secrets that should never appear in version control. It combines deterministic toolchain output (gitleaks, trufflehog, trivy) with targeted regex scanning for common secret formats. The cardinal rule: **any hardcoded production-looking secret is ALWAYS critical severity** regardless of context.
+This skill scans for hardcoded secrets that should never appear in version control. It combines deterministic toolchain output (gitleaks, trufflehog, trivy) with targeted regex scanning for common secret formats. The cardinal rule: **any hardcoded production-looking PRIVATE secret is ALWAYS critical severity** regardless of context — but publishable-by-design keys (Firebase web config, Stripe `pk_`, etc.) are NOT secrets and must not be flagged as critical.
+
+## How to run this audit — read first
+
+This skill is executed by a Sonnet-class model. Follow these shared protocols:
+
+- **`shared/scan-discipline.md`** — grep hygiene (all scans below use `git grep`, which walks
+  tracked files safely — never iterate `$(git ls-files)`), triage, and the worklog.
+- **`shared/verification.md`** — before emitting a `critical`, confirm the match is a real
+  private secret (not a placeholder, fixture, example, or publishable key) and mask its value.
+- **`shared/security-calibration.md`** — the publishable / private key distinction (see the
+  "Publishable / public-by-design keys" pairs). Do not flag public keys as critical.
+- **`shared/suppressions.md`** — honor `tenet-ignore` comments and `[suppressions]` config.
 
 ## Language Support Matrix
 
@@ -125,69 +137,75 @@ Even with gitleaks, some patterns benefit from explicit scanning. Search all com
 
 ```bash
 # AWS Access Key ID (starts with AKIA)
-grep -rnE "AKIA[0-9A-Z]{16}" $(git ls-files) 2>/dev/null
-# AWS Secret Access Key (40-char base64)
-grep -rnE "(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}" $(git ls-files) 2>/dev/null
-```
+git grep -nE "AKIA[0-9A-Z]{16}"# AWS Secret Access Key (40-char base64)
+git grep -nE "(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}"```
 
 #### GitHub Tokens
 
 ```bash
 # GitHub personal access tokens (classic and fine-grained)
-grep -rnE "(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|ghr_[A-Za-z0-9]{36})" $(git ls-files) 2>/dev/null
-```
+git grep -nE "(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|ghr_[A-Za-z0-9]{36})"```
 
 #### Generic API Keys and Tokens
 
 ```bash
 # API keys in assignment or config
-grep -rnE "(api[_-]?key|api[_-]?secret|api[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{20,}" $(git ls-files) 2>/dev/null
-# Bearer tokens hardcoded
-grep -rnE "Bearer\s+[A-Za-z0-9_\-\.]{20,}" $(git ls-files) 2>/dev/null
-```
+git grep -nE "(api[_-]?key|api[_-]?secret|api[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{20,}"# Bearer tokens hardcoded
+git grep -nE "Bearer\s+[A-Za-z0-9_\-\.]{20,}"```
 
 #### Database Connection Strings with Passwords
 
 ```bash
 # PostgreSQL / MySQL / MongoDB connection strings
-grep -rnE "(postgres|mysql|mongodb)://[^:]+:[^@]+@" $(git ls-files) 2>/dev/null
-# Redis with password
-grep -rnE "redis://:[^@]+@" $(git ls-files) 2>/dev/null
-```
+git grep -nE "(postgres|mysql|mongodb)://[^:]+:[^@]+@"# Redis with password
+git grep -nE "redis://:[^@]+@"```
 
 #### Private Keys
 
 ```bash
 # PEM-encoded private keys
-grep -rlE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----" $(git ls-files) 2>/dev/null
-```
+git grep -lE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----"```
 
 #### JWT Secrets
 
 ```bash
 # JWT secret in config
-grep -rnE "(jwt[_-]?secret|JWT_SECRET|jwt[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}" $(git ls-files) 2>/dev/null
-```
+git grep -nE "(jwt[_-]?secret|JWT_SECRET|jwt[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}"```
 
 #### Slack/Stripe/SendGrid/Twilio Tokens
 
 ```bash
 # Slack
-grep -rnE "xox[baprs]-[A-Za-z0-9\-]{10,}" $(git ls-files) 2>/dev/null
-# Stripe
-grep -rnE "(sk_live|rk_live)_[A-Za-z0-9]{20,}" $(git ls-files) 2>/dev/null
-# SendGrid
-grep -rnE "SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}" $(git ls-files) 2>/dev/null
-# Twilio
-grep -rnE "SK[0-9a-fA-F]{32}" $(git ls-files) 2>/dev/null
-```
+git grep -nE "xox[baprs]-[A-Za-z0-9\-]{10,}"# Stripe
+git grep -nE "(sk_live|rk_live)_[A-Za-z0-9]{20,}"# SendGrid
+git grep -nE "SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}"# Twilio
+git grep -nE "SK[0-9a-fA-F]{32}"```
 
 For each regex match:
 1. Check if it was already found by gitleaks/trufflehog — skip if so
 2. Verify it is NOT in a test fixture, example, documentation, or placeholder (`CHANGEME`, `xxx`, `your-key-here`, `<api-key>`, `TODO`)
 3. Check the file extension — some matches in `.md` or comment blocks may be examples
-4. Set `confidence: "heuristic"` for grep-only findings
-5. Severity is still `critical` for anything that looks like a real secret
+4. **Check the publishable-key allowlist (below)** — publishable/public keys are safe by
+   design and must NOT be flagged as critical
+5. Set `confidence: "heuristic"` for grep-only findings
+6. Severity is `critical` for anything that looks like a real PRIVATE secret
+
+#### Publishable / public-by-design keys — do NOT flag as critical
+
+Some keys are meant to ship in client-side code. Flagging them critical every run is a false
+positive that trains the reader to ignore the report. These are safe (skip, or `info` at most):
+
+- **Firebase web config** — `apiKey`, `authDomain`, `projectId`, etc. (security is in Firebase
+  rules, not the key)
+- **Stripe publishable key** — `pk_live_…` / `pk_test_…` (flag the SECRET `sk_live_…`)
+- **Supabase `anon` public key** (flag the `service_role` key)
+- **Mapbox `pk.…`, Google Maps browser key, Sentry public DSN, PostHog/Segment/Amplitude
+  public write keys**
+
+Still flag the private counterparts as critical: `sk_live_…`, Supabase `service_role`,
+Firebase Admin SDK service-account JSON / private key, any `*_SECRET`, any `*_PRIVATE_KEY`.
+When unsure whether a public-looking key is truly publishable, emit `minor` with a note to
+confirm — never `critical`. See `shared/security-calibration.md`.
 
 ### Step 7: Check .gitignore for .env
 
@@ -233,11 +251,11 @@ For secrets found only in git history (not in current HEAD):
 
 ```bash
 # Math.random used for tokens/secrets/IDs
-grep -rnE "Math\.random\(\)" --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" $(git ls-files) 2>/dev/null
+git grep -nE "Math\.random\(\)" -- '*.ts' '*.js' '*.tsx' '*.jsx'
 # Python random for tokens
-grep -rnE "random\.(choice|randint|random|sample)\(" --include="*.py" $(git ls-files) 2>/dev/null
+git grep -nE "random\.(choice|randint|random|sample)\(" -- '*.py'
 # Go math/rand for tokens
-grep -rnE "math/rand" --include="*.go" $(git ls-files) 2>/dev/null
+git grep -nE "math/rand" -- '*.go'
 ```
 
 For each match:
@@ -246,7 +264,15 @@ For each match:
 3. Severity: `major` for security-context usage, skip for non-security usage
 4. Set `confidence: "heuristic"`
 
-### Step 10: Score Calculation
+### Step 10: Verify & Apply Suppressions
+
+Per `shared/verification.md`, confirm each candidate secret before it enters the report: open
+the file, confirm it is a real private secret (not a placeholder/fixture/example/publishable
+key), and **mask the value** (first 4 chars + `****`). Then per `shared/suppressions.md`, demote
+any finding matched by a `tenet-ignore` comment or `[suppressions]` config to `info` with the
+stated reason, and track `metrics.suppressed_count`. Never suppress silently.
+
+### Step 11: Score Calculation
 
 Apply the standard scoring formula from `shared/severity.md`:
 
@@ -259,7 +285,7 @@ Info findings do NOT affect the score.
 
 **Note:** Because every confirmed hardcoded secret is `critical`, even a single real secret drops the score by 5 points. Three confirmed secrets puts the score at 85 or lower. This is intentional — secrets in VCS are among the highest-risk findings.
 
-### Step 11: Write Report
+### Step 12: Write Report
 
 Write the dimension report to `.healthcheck/reports/secrets.json`:
 
@@ -268,7 +294,7 @@ Write the dimension report to `.healthcheck/reports/secrets.json`:
   "key": "secrets",
   "score": 85,
   "weight": 1.5,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "applicable": true,
   "notes": "Found 3 critical hardcoded secrets (2 AWS keys, 1 database password), 1 major .gitignore gap, and 1 minor .env.development commit. Gitleaks detected 2 of 3 secrets; regex scan found 1 additional.",
   "metrics": {
@@ -336,7 +362,9 @@ Write the dimension report to `.healthcheck/reports/secrets.json`:
 ## Constraints
 
 - **Gitleaks is REQUIRED.** Do not produce a report without gitleaks output. Fail with an actionable error message.
-- **Cardinal rule:** Any hardcoded production-looking secret is ALWAYS `critical`. No exceptions, no demotions.
+- **Cardinal rule:** Any hardcoded production-looking PRIVATE secret is ALWAYS `critical`. No exceptions, no demotions.
+- **Publishable keys are not secrets.** Firebase web config, Stripe `pk_`, Supabase `anon`, Mapbox `pk.`, public DSNs, and browser map keys are safe by design — never flag them critical (see `shared/security-calibration.md`). Flag their private counterparts.
+- ALWAYS honor `tenet-ignore` comments and `[suppressions]` config (Step 10).
 - NEVER include the actual secret value in the finding `description`, `title`, or `fix_prompt`. Redact to first 4 characters + `****` (e.g., `AKIA****`, `ghp_X****`). The `snippet` field may show surrounding code but MUST mask the secret value.
 - NEVER flag known test/example values: `AKIAIOSFODNN7EXAMPLE` (AWS docs example), `your-api-key-here`, `CHANGEME`, `xxx`, `TODO`, `<token>`.
 - ALWAYS check if a secret-looking string is in a test fixture or documentation before flagging.

@@ -2,7 +2,7 @@
 name: tenet-infra-cloud
 description: "Audits IaC and cloud risks: exposure, IAM wildcards, encryption, buckets, Kubernetes, and drift."
 when_to_use: "Infrastructure audit, cloud security, Terraform review, Kubernetes security, IAM policy, storage bucket exposure, tenet infra-cloud"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

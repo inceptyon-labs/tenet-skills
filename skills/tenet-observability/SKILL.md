@@ -2,7 +2,7 @@
 name: tenet-observability
 description: "Audits logging, trace/correlation IDs, metrics, health checks, and shutdown handling."
 when_to_use: "Observability audit, logging review, metrics check, health endpoint, tracing, tenet observability"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

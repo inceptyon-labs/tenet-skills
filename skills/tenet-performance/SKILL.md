@@ -2,7 +2,7 @@
 name: tenet-performance
 description: "Audits performance risks: N+1 queries, sync I/O, indexes, leaks, bundles, and rerenders."
 when_to_use: "Performance audit, N+1 queries, memory leaks, bundle size, React performance, tenet performance"
-model: opus
+model: sonnet
 allowed-tools: Bash Read Grep Glob Write
 ---
 

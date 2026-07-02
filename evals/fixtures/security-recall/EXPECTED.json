@@ -1,0 +1,39 @@
+{
+  "fixture": "security-recall",
+  "description": "Ground truth for benchmarking tenet-security (and the publishable-key path of tenet-secrets) recall and precision. Run the skill against this directory as the project root, then score the produced .healthcheck/reports/security.json (and optionally secrets.json) with ../../score-fixtures.py.",
+  "dimension": "security",
+  "severity_order": ["info", "minor", "major", "critical"],
+  "expected_findings": [
+    { "id": "P01", "rule": "SEC-INJ-001",    "file": "src/db/users.ts",          "class": "injection",       "min_severity": "critical" },
+    { "id": "P02", "rule": "SEC-INJ-002",    "file": "src/util/convert.ts",      "class": "injection",       "min_severity": "critical" },
+    { "id": "P03", "rule": "SEC-INJ-003",    "file": "src/components/Comment.tsx","class": "injection",       "min_severity": "critical" },
+    { "id": "P04", "rule": "SEC-INJ-004",    "file": "src/api/search.ts",        "class": "injection",       "min_severity": "major" },
+    { "id": "P05", "rule": "SEC-AUTHZ-IDOR", "file": "src/api/orders.ts",        "class": "access_control",  "min_severity": "critical" },
+    { "id": "P06", "rule": "SEC-AUTHZ-TENANT","file": "src/api/scores.ts",       "class": "access_control",  "min_severity": "critical" },
+    { "id": "P07", "rule": "SEC-AUTHZ-MASS", "file": "src/api/profile.ts",       "class": "access_control",  "min_severity": "major" },
+    { "id": "P08", "rule": "SEC-VAL-003",    "file": "src/api/files.ts",         "class": "validation",      "min_severity": "critical" },
+    { "id": "P09", "rule": "SEC-AUTH-003",   "file": "src/auth/jwt.ts",          "class": "auth",            "min_severity": "critical" },
+    { "id": "P10", "rule": "SEC-AUTH-007",   "file": "src/auth/reset.ts",        "class": "auth",            "min_severity": "major" },
+    { "id": "P11", "rule": "SEC-CRYPTO-001", "file": "src/auth/hash.ts",         "class": "crypto",          "min_severity": "critical" },
+    { "id": "P12", "rule": "SEC-CRYPTO-004", "file": "src/auth/token.ts",        "class": "crypto",          "min_severity": "major" },
+    { "id": "P13", "rule": "SEC-SSRF-001",   "file": "src/api/proxy.ts",         "class": "ssrf",            "min_severity": "major" },
+    { "id": "P14", "rule": "SEC-CORS-001",   "file": "src/server.ts",            "class": "config",          "min_severity": "critical" },
+    { "id": "P15", "rule": "SEC-AUTH-008",   "file": "src/api/webhook.ts",       "class": "auth",            "min_severity": "major" },
+    { "id": "P16", "rule": "SEC-DESER-006",  "file": "src/util/merge.ts",        "class": "deserialization", "min_severity": "major" },
+    { "id": "P17", "rule": "SEC-PARSE-002",  "file": "src/util/unzip.ts",        "class": "parsing",         "min_severity": "major" },
+    { "id": "P18", "rule": "SEC-DEFAULT-002","file": "config/prod.ts",           "class": "config",          "min_severity": "critical" },
+    { "id": "P19", "rule": "SEC-DESER-002",  "file": "scripts/load_config.py",   "class": "deserialization", "min_severity": "major" },
+    { "id": "P20", "rule": "SEC-MOBILE-001", "file": "ios/Session.swift",        "class": "platform",        "min_severity": "major" }
+  ],
+  "decoys": [
+    { "id": "D1", "file": "src/db/accounts.ts",        "label": "parameterized-query",   "allowed_max_severity": null },
+    { "id": "D2", "file": "src/db/reports.ts",         "label": "drizzle-tagged-template","allowed_max_severity": null },
+    { "id": "D3", "file": "src/components/Bio.tsx",     "label": "sanitized-html",        "allowed_max_severity": null },
+    { "id": "D4", "file": "src/util/thumbnail.ts",      "label": "execFile-array",        "allowed_max_severity": null },
+    { "id": "D5", "file": "src/util/retry.ts",          "label": "math-random-jitter",    "allowed_max_severity": null },
+    { "id": "D6", "file": "src/util/cache.ts",          "label": "sha1-cachekey",         "allowed_max_severity": "info" },
+    { "id": "D7", "file": "src/api/invoices.ts",        "label": "scoped-query",          "allowed_max_severity": null },
+    { "id": "D8", "file": "src/config/stripe.ts",       "label": "publishable-key",       "allowed_max_severity": "minor", "dimension": "secrets" },
+    { "id": "D9", "file": "src/api/fetchWhitelisted.ts","label": "ssrf-allowlisted",      "allowed_max_severity": null }
+  ]
+}

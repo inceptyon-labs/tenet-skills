@@ -12,13 +12,13 @@
 
 > *"I build in a twilight world."*
 
-A Claude Code plugin containing 22 coordinated skills for application health auditing. Produces structured reports for the **Tenet** dashboard — a self-hosted Fastify + Postgres application that tracks project health over time.
+A Claude Code plugin containing 23 coordinated skills for application health auditing. Produces structured reports for the **Tenet** dashboard — a self-hosted Fastify + Postgres application that tracks project health over time.
 
 ## What is Tenet?
 
 Tenet is a two-part system:
 
-1. **tenet-skills** (this repo) — A Claude Code plugin that audits your codebase across 19 dimensions: security, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, build/CI, privacy/data, supply chain/license, infrastructure/cloud, database migrations, and release operations.
+1. **tenet-skills** (this repo) — A Claude Code plugin that audits your codebase across 20 dimensions: security, correctness, complexity, SOLID, performance, dependencies, debt, testing, docs, accessibility, API contracts, secrets, errors, observability, build/CI, privacy/data, supply chain/license, infrastructure/cloud, database migrations, and release operations.
 2. **tenet-dashboard** (separate repo) — A self-hosted web dashboard that receives reports, tracks trends, and lets you copy fix prompts directly into Claude Code.
 
 Each audit run produces a single JSON report with per-dimension scores (0-100) and actionable findings. Every finding includes a **fix prompt** — a self-contained instruction you can paste into Claude Code to resolve the issue.
@@ -159,6 +159,7 @@ conftest = "auto"
 
 [weights]
 security = 1.5           # Override dimension weight
+correctness = 1.3
 complexity = 1.1
 privacy-data = 1.3
 supply-chain-license = 1.2
@@ -169,6 +170,12 @@ release-ops = 1.0
 [dimensions]
 accessibility = "off"    # Disable a dimension entirely
 infra-cloud = "off"
+
+[suppressions]
+# Accept a known finding (demoted to info, recorded with a reason) so it stops
+# re-appearing as critical every run. Inline `// tenet-ignore: <RULE-ID> <reason>`
+# comments work too. See shared/suppressions.md.
+"SEC-DEFAULT-005" = "internal LAN-only tool, HTTP is intentional"
 
 [testing.mutation]
 # Tenet ingests mutation reports; project CI/local scripts run the mutation tool.

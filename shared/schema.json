@@ -3,11 +3,21 @@
   "title": "Tenet Health Report",
   "description": "Schema for a complete Tenet audit report uploaded to the dashboard. Individual dimension reports use shared/dimension_schema.json.",
   "type": "object",
-  "required": ["project", "run", "dimensions", "findings"],
+  "required": [
+    "project",
+    "run",
+    "dimensions",
+    "findings"
+  ],
   "properties": {
     "project": {
       "type": "object",
-      "required": ["slug", "name", "commit", "branch"],
+      "required": [
+        "slug",
+        "name",
+        "commit",
+        "branch"
+      ],
       "properties": {
         "slug": {
           "type": "string",
@@ -19,7 +29,10 @@
           "description": "Human-readable project name"
         },
         "repo_url": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "description": "Git remote origin URL if present"
         },
         "commit": {
@@ -34,7 +47,12 @@
     },
     "run": {
       "type": "object",
-      "required": ["started_at", "completed_at", "orchestrator_version", "dimensions_run"],
+      "required": [
+        "started_at",
+        "completed_at",
+        "orchestrator_version",
+        "dimensions_run"
+      ],
       "properties": {
         "started_at": {
           "type": "string",
@@ -52,7 +70,9 @@
         },
         "dimensions_run": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "List of dimension keys that were executed"
         },
         "toolchain_summary": {
@@ -61,24 +81,52 @@
           "additionalProperties": {
             "type": "object",
             "properties": {
-              "ran": { "type": "boolean" },
-              "version": { "type": ["string", "null"] },
-              "duration_ms": { "type": ["integer", "null"] },
-              "finding_count": { "type": ["integer", "null"] },
+              "ran": {
+                "type": "boolean"
+              },
+              "version": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "duration_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "finding_count": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "mode": {
                 "type": "string",
-                "enum": ["required", "auto", "off", "missing"]
+                "enum": [
+                  "required",
+                  "auto",
+                  "off",
+                  "missing"
+                ]
               }
             }
           }
         },
         "lines_of_code": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0,
           "description": "Repository-wide LOC count shown in the dashboard header. Prefer language-census total_loc; otherwise sum languages[].loc."
         },
         "files_analyzed": {
-          "type": ["integer", "null"],
+          "type": [
+            "integer",
+            "null"
+          ],
           "minimum": 0,
           "description": "Repository-wide tracked file count shown in the dashboard header. Prefer language-census total_files; otherwise sum languages[].files."
         }
@@ -88,14 +136,24 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["key", "score", "weight", "skill_version", "notes", "applicable"],
+        "required": [
+          "key",
+          "score",
+          "weight",
+          "skill_version",
+          "notes",
+          "applicable"
+        ],
         "properties": {
           "key": {
             "type": "string",
             "description": "Dimension identifier (e.g., 'security', 'complexity')"
           },
           "score": {
-            "type": ["integer", "null"],
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 0,
             "maximum": 100,
             "description": "0-100 integer score, null if not applicable"
@@ -128,7 +186,10 @@
             "description": "Structured checklist entries shown in the dashboard's 'What was tested' section for this dimension.",
             "items": {
               "type": "object",
-              "required": ["name", "status"],
+              "required": [
+                "name",
+                "status"
+              ],
               "properties": {
                 "name": {
                   "type": "string",
@@ -137,7 +198,12 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": ["passed", "failed", "skipped", "info"],
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "skipped",
+                    "info"
+                  ],
                   "description": "Outcome of the check."
                 },
                 "description": {
@@ -151,7 +217,10 @@
                   "description": "Optional compact evidence, examples, or grouped results."
                 },
                 "count": {
-                  "type": ["integer", "null"],
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
                   "minimum": 0,
                   "description": "Optional count associated with this check, such as findings matched or files scanned."
                 },
@@ -170,7 +239,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["dimension", "severity", "title", "description", "fix_prompt"],
+        "required": [
+          "dimension",
+          "severity",
+          "title",
+          "description",
+          "fix_prompt"
+        ],
         "properties": {
           "dimension": {
             "type": "string",
@@ -178,7 +253,12 @@
           },
           "severity": {
             "type": "string",
-            "enum": ["critical", "major", "minor", "info"],
+            "enum": [
+              "critical",
+              "major",
+              "minor",
+              "info"
+            ],
             "description": "Finding severity level"
           },
           "title": {
@@ -191,16 +271,25 @@
             "description": "2-4 sentence explanation of what and why it matters"
           },
           "file": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "description": "Relative path from repo root"
           },
           "line": {
-            "type": ["integer", "null"],
+            "type": [
+              "integer",
+              "null"
+            ],
             "minimum": 1,
             "description": "1-based source line number for the primary actionable location. Use null for file-level, project-level, dependency-level, or otherwise non-local findings. This value must match the Line entry in fix_prompt."
           },
           "snippet": {
-            "type": ["string", "null"],
+            "type": [
+              "string",
+              "null"
+            ],
             "maxLength": 500,
             "description": "Offending code snippet"
           },
@@ -210,8 +299,25 @@
           },
           "confidence": {
             "type": "string",
-            "enum": ["deterministic", "native", "tree_sitter", "heuristic"],
+            "enum": [
+              "deterministic",
+              "native",
+              "tree_sitter",
+              "heuristic"
+            ],
             "description": "Confidence tier of the detection method"
+          },
+          "suppressed": {
+            "type": "boolean",
+            "default": false,
+            "description": "True when this finding was matched by a tenet-ignore comment or a [suppressions] config entry and demoted to info. Suppressed findings do not affect the score and are rendered as accepted risks."
+          },
+          "suppressed_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The developer-supplied justification for accepting this risk (from the tenet-ignore comment or [suppressions] entry). Required when suppressed is true."
           }
         }
       }
