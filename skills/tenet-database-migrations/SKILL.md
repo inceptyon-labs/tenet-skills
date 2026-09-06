@@ -1,14 +1,27 @@
 ---
 name: tenet-database-migrations
 description: "Audits migration safety: destructive changes, indexes, rollbacks, transactions, locks, and backfills."
-when_to_use: "Database migration audit, schema review, migration safety, index check, rollback planning, data backfill, tenet database-migrations"
+when_to_use: "tenet database-migrations, tenet-database-migrations dimension, Tenet database migration safety audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-database-migrations."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
 # Tenet Database Migrations
 
 Audits database evolution risk. This catches schema changes that can break production data, lock large tables, or leave the app unable to roll back safely.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

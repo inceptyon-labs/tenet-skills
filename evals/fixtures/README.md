@@ -54,6 +54,19 @@ points at a calibration gap (add a flag/do-NOT-flag pair). This is especially im
 the skills are executed by Sonnet-class models, where wording changes swing results hard — the
 fixtures turn "I think this prompt is better" into a number.
 
+## Recorded runs
+
+| Date | Prompts | Model | Recall | Decoy FPs | Findings | Notes |
+|---|---|---|---|---|---|---|
+| 2026-09-05 | pre-calibration (commit 8906156) | sonnet | 20/20 | 0 | 14 crit / 7 major / 1 info | The `info` was the SHA-1 cache-key decoy, emitted under the old "info at most" rule |
+| 2026-09-05 | calibration rewrite (drop unconfirmed, no escalate-on-doubt) | sonnet | 20/20 | 0 | 13 crit / 8 major / 0 info | Decoy no longer emitted at all |
+| 2026-09-05 | calibration rewrite | fable | 20/20 | 0 | 13 crit / 8 major / 0 info | Identical to Sonnet on this fixture; it is too easy to separate the tiers |
+
+The fixture is saturated: every run scores 100/100. It proves the calibration change did not cost
+recall, but it cannot rank models. Next step for measuring the judge tier is a harder fixture with
+bugs that need cross-file tracing (a guard in one file that is bypassed via another route, a
+tenant filter present on the list endpoint but missing on the detail endpoint).
+
 ## Extending
 
 Add a planted file with a `// PLANT <RULE-ID>` comment and an entry in `expected_findings`, or a

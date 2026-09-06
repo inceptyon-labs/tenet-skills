@@ -1,8 +1,9 @@
 ---
 name: tenet-performance
 description: "Audits performance risks: N+1 queries, sync I/O, indexes, leaks, bundles, and rerenders."
-when_to_use: "Performance audit, N+1 queries, memory leaks, bundle size, React performance, tenet performance"
-model: sonnet
+when_to_use: "tenet performance, tenet-performance dimension, Tenet performance anti-pattern audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-performance."
+model: opus
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -13,6 +14,18 @@ allowed-tools: Bash Read Grep Glob Write
 ## Purpose
 
 This skill identifies performance anti-patterns that are detectable without runtime profiling. It scans for N+1 query patterns (loop + await query), synchronous I/O in hot paths, missing database indexes, unbounded queries, memory leaks, bundle size issues in frontend projects, and React re-render hazards. Findings are grounded in specific code locations with actionable fix_prompts.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 
@@ -320,7 +333,7 @@ Write `.healthcheck/reports/performance.json`:
 - **No runtime profiling.** This skill performs static analysis only. Do not execute application code, start servers, or run benchmarks.
 - **Respect .gitignore.** Use `git ls-files` as the file list source. Never scan `node_modules/`, `dist/`, `build/`, `.next/`, `__pycache__/`, `venv/`, `.venv/`.
 - **Confidence tagging.** All heuristic findings MUST include `"confidence": "heuristic"`. Native findings use `"confidence": "native"`.
-- **False positive management.** When in doubt, prefer `minor` over `major`. Clearly state in the description when a finding may be a false positive (e.g., "This cache may have intentional unbounded growth if the key space is small").
+- **Confirm before reporting.** A performance finding needs a stated mechanism from this code: which loop issues N queries, which handler blocks on sync I/O, which cache has no eviction and grows with real traffic. If you cannot state it from the code (for example, a Map that could grow unbounded but whose key space is a fixed enum), it is not a finding. Drop it; do not emit it as `minor` with a disclaimer.
 - **Exclude test files from most checks.** Test files (`*.test.*`, `*.spec.*`, `__tests__/`, `test/`, `tests/`) are excluded from N+1, sync I/O, and bundle checks. Memory leak checks still apply to test setup/teardown files.
 - **Exclude config/build files from sync I/O checks.** Files in `scripts/`, `bin/`, config files, and migration scripts may legitimately use synchronous I/O.
 - **All findings must include a fix_prompt.** Every finding must have a self-contained fix_prompt following the template in `shared/fix_prompt_template.md`.

@@ -1,8 +1,9 @@
 ---
 name: tenet-secrets
 description: "Scans committed files and history for hardcoded tokens, keys, passwords, and private secrets."
-when_to_use: "Secret scan, credential leak, API key check, token exposure, tenet secrets"
+when_to_use: "tenet secrets, tenet-secrets dimension, Tenet secret scanning audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-secrets."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -16,7 +17,8 @@ This skill scans for hardcoded secrets that should never appear in version contr
 
 ## How to run this audit — read first
 
-This skill is executed by a Sonnet-class model. Follow these shared protocols:
+The model running this skill is set by the orchestrator (`[models].worker` in `.healthcheck.toml`).
+Whatever the model, follow these shared protocols:
 
 - **`shared/scan-discipline.md`** — grep hygiene (all scans below use `git grep`, which walks
   tracked files safely — never iterate `$(git ls-files)`), triage, and the worklog.
@@ -108,7 +110,7 @@ For each gitleaks finding:
 1. Map the gitleaks `RuleID` to a Tenet finding type (see Rubric below)
 2. Determine severity:
    - **All confirmed secrets** → `critical` (this is the cardinal rule)
-   - **Possible false positives** (e.g., example values, placeholder strings) → review context, demote to `major` only if clearly not a real secret
+   - **Possible false positives** (e.g., example values, placeholder strings, `xxx`/`changeme`, obviously synthetic test tokens) → read the surrounding code; if it is not a real secret, drop it (no finding). If it is real, it is `critical`. There is no in-between severity for "maybe a secret"
 3. Deduplicate: if the same file+line appears in both gitleaks and trufflehog, prefer gitleaks and enrich with trufflehog metadata
 4. Set `confidence: "deterministic"`
 5. Generate a `fix_prompt` for each finding

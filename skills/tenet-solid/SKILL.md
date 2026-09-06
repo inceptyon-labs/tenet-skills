@@ -1,8 +1,9 @@
 ---
 name: tenet-solid
 description: "Audits SOLID design risks: responsibility, substitution, interfaces, dependency direction."
-when_to_use: "SOLID audit, design principles, SRP, OCP, LSP, ISP, DIP, architecture review, tenet solid"
+when_to_use: "tenet solid, tenet-solid dimension, Tenet SOLID design audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-solid."
 model: opus
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -21,6 +22,18 @@ This skill assesses whether the codebase follows the SOLID design principles —
 5. **D — Dependency Inversion Principle (DIP):** High-level modules should depend on abstractions, not concrete implementations
 
 SOLID violations make code rigid, fragile, and resistant to change. They are leading indicators of future bugs when requirements evolve.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 
@@ -303,7 +316,7 @@ Write the dimension report to `.healthcheck/reports/solid.json`:
 - **Exclude test files from SRP analysis:** Test helper classes with many methods are not SRP violations.
 - **Max findings cap:** Emit at most 50 findings. Keep all critical, then major, then minor, then info. Add an info finding noting omitted count.
 - **Scoring math is pure:** The score formula is arithmetic only — no LLM judgment in the number.
-- **Be conservative:** When uncertain whether a pattern is a violation, prefer `info` over `minor` or omit entirely. SOLID is contextual — a class with 3 responsibility clusters may be perfectly fine if it is a facade or orchestrator by design.
+- **Be conservative:** When uncertain whether a pattern is a violation, omit it. Do not park uncertainty at `info`. SOLID is contextual — a class with 3 responsibility clusters may be perfectly fine if it is a facade or orchestrator by design.
 - **No positive findings:** Do NOT emit findings for well-implemented patterns ("this class correctly uses the strategy pattern"). Positive observations belong in the `dimension.notes` field. The findings array is exclusively for things that need attention or conscious decisions. Every finding — including `info` — must describe something the developer could change.
 
 ## fix_prompt Examples

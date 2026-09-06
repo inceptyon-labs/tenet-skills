@@ -1,8 +1,9 @@
 ---
 name: tenet-observability
 description: "Audits logging, trace/correlation IDs, metrics, health checks, and shutdown handling."
-when_to_use: "Observability audit, logging review, metrics check, health endpoint, tracing, tenet observability"
+when_to_use: "tenet observability, tenet-observability dimension, Tenet observability audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-observability."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ Audits the project's observability posture across six pillars: structured loggin
 ## Purpose
 
 Production systems that lack observability are blind. When incidents occur, teams without structured logs, correlation IDs, metrics, and health endpoints spend hours guessing instead of minutes resolving. This skill detects observability gaps before they become 3 AM pages.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

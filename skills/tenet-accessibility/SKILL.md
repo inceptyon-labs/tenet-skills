@@ -1,8 +1,9 @@
 ---
 name: tenet-accessibility
 description: "Audits web accessibility issues in HTML, JSX, TSX, Vue, and Svelte UI code."
-when_to_use: "Accessibility audit, a11y check, ARIA labels, alt text, WCAG compliance, tenet accessibility"
+when_to_use: "tenet accessibility, tenet-accessibility dimension, Tenet accessibility (a11y/WCAG) audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-accessibility."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -13,6 +14,18 @@ allowed-tools: Bash Read Grep Glob Write
 ## Purpose
 
 Accessibility failures exclude users and expose projects to legal risk. This skill audits the view layer of web applications for common a11y violations that automated tools can reliably detect. It combines deterministic toolchain output (axe-core, pa11y) with grep-based pattern matching on source files to catch issues at the template level before they reach the browser.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Applicability Check
 

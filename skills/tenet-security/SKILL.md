@@ -1,8 +1,9 @@
 ---
 name: tenet-security
 description: "Audits security vulnerabilities including injection, broken access control (IDOR, tenant isolation), auth, validation, crypto, SSRF, CORS, CSRF, and platform-specific risks."
-when_to_use: "Security audit, vulnerability scan, injection check, auth review, IDOR, OWASP check, tenet security"
-model: sonnet
+when_to_use: "tenet security, tenet-security dimension, Tenet security vulnerability audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-security."
+model: opus
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -22,8 +23,9 @@ relying on grep alone. Every finding includes a self-contained `fix_prompt`.
 
 ## How to run this audit — read first
 
-This skill is executed by a Sonnet-class model. Follow these shared protocols exactly; they
-are what turn a shallow grep pass into a real audit:
+The model running this skill is set by the orchestrator (`[models].judge` in `.healthcheck.toml`).
+Whatever the model, follow these shared protocols exactly; they are what turn a shallow grep
+pass into a real audit, and they are also what keep it from inventing findings to fill the report:
 
 - **`shared/scan-discipline.md`** — grep hygiene (use `git grep`, exclude vendored code,
   triage before reading), anti-laziness rules (complete every step, enumerate don't sample),
@@ -331,8 +333,8 @@ on user data → `major`.
 Before anything enters the report, run every candidate `major`/`critical` finding through
 `shared/verification.md`: read the actual code, capture the exact offending line into
 `snippet`, trace that untrusted input truly reaches the sink, and actively try to refute it
-using the pairs in `shared/security-calibration.md`. Drop or demote anything you cannot
-confirm. Set `confidence` honestly. A report where every critical is defensible line-by-line
+using the pairs in `shared/security-calibration.md`. Drop anything you cannot confirm; an
+unconfirmed candidate is not reported at a lower severity. Set `confidence` honestly. A report where every critical is defensible line-by-line
 is the goal.
 
 ### Step 17: Apply Suppressions

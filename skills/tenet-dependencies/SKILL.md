@@ -1,8 +1,9 @@
 ---
 name: tenet-dependencies
 description: "Audits dependencies for CVEs, stale packages, duplicates, unused deps, and outdated versions."
-when_to_use: "Dependency audit, CVE scan, outdated packages, npm audit, pip-audit, tenet dependencies"
+when_to_use: "tenet dependencies, tenet-dependencies dimension, Tenet dependency health audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-dependencies."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -13,6 +14,18 @@ allowed-tools: Bash Read Grep Glob Write
 ## Purpose
 
 This skill evaluates the health of a project's dependency tree across five dimensions: known CVEs (security vulnerabilities with published advisories), unmaintained packages (no release in >2 years), duplicate dependencies (multiple packages serving the same purpose), unused dependencies (declared but never imported), and severely outdated versions (pinned to old majors when newer majors exist). It consumes toolchain output from vulnerability scanners and supplements with its own manifest analysis.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

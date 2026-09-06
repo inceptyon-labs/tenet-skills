@@ -1,8 +1,9 @@
 ---
 name: tenet-errors
 description: "Audits error handling: empty catches, swallowed async errors, inconsistent types, and missing timeouts."
-when_to_use: "Error handling audit, catch block review, unhandled rejection, error boundaries, tenet errors"
-model: sonnet
+when_to_use: "tenet errors, tenet-errors dimension, Tenet error handling audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-errors."
+model: opus
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ allowed-tools: Bash Read Grep Glob Write
 This skill evaluates the quality and consistency of error handling throughout a project. Poor error handling is one of the most common sources of production incidents: an empty catch block turns a recoverable error into a silent data corruption, an unhandled Promise rejection crashes a Node.js process, and a missing error boundary takes down an entire React app for a single component failure.
 
 The goal is not to mandate a specific error handling strategy, but to ensure that every error path is deliberate. If you catch an error, you should log it, rethrow it, recover from it, or explicitly document why you are ignoring it. If you make a network call, you should handle timeouts. If you use async iteration, you should handle errors from the iterable.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 
@@ -166,7 +179,7 @@ catch (Exception e) {
   - Only `return` with no logging or error propagation
   - Only a comment like `// TODO`, `// ignore`, `// intentionally empty`
 
-**Exception:** A comment explicitly stating WHY the error is ignored (e.g., `// Expected error during cleanup, safe to ignore because X`) should reduce the finding to `info` severity.
+**Exception:** A comment explicitly stating WHY the error is ignored (e.g., `// Expected error during cleanup, safe to ignore because X`) is a deliberate decision, not a finding. Do not report it.
 
 **Severity:** major for empty catch blocks in production code, minor in test/utility code.
 

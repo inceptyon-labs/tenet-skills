@@ -1,14 +1,27 @@
 ---
 name: tenet-release-ops
 description: "Audits release readiness, rollback, feature flags, env drift, runbooks, SLOs, and smoke checks."
-when_to_use: "Release audit, deployment readiness, rollback plan, feature flags, runbook review, production smoke tests, tenet release-ops"
+when_to_use: "tenet release-ops, tenet-release-ops dimension, Tenet release operations audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-release-ops."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
 # Tenet Release Operations
 
 Audits whether changes can be shipped, observed, and rolled back safely. This complements `tenet-build-ci` by focusing on production release mechanics after CI turns green.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

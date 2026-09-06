@@ -1,8 +1,9 @@
 ---
 name: tenet-debt
 description: "Audits TODO/FIXME debt, commented code, deprecated APIs, stubs, and temporary flags."
-when_to_use: "Tech debt audit, TODO scan, deprecated code, dead code, tenet debt"
+when_to_use: "tenet debt, tenet-debt dimension, Tenet technical debt audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-debt."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ Detects and ages technical debt markers across any language: TODO/FIXME/HACK/XXX
 ## Purpose
 
 Technical debt is invisible until it compounds into a crisis. This skill surfaces debt systematically by scanning for known debt markers, aging them via git blame, and classifying severity by how long the debt has festered. A TODO from last week is healthy engineering practice; a TODO from two years ago is a lie.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

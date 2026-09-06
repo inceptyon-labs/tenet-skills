@@ -1,8 +1,9 @@
 ---
 name: tenet-build-ci
 description: "Audits CI, reproducible builds, lockfiles, pinned tools, secret handling, and image security."
-when_to_use: "CI audit, build config review, Docker security, GitHub Actions review, tenet build-ci"
+when_to_use: "tenet build-ci, tenet-build-ci dimension, Tenet build and CI audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-build-ci."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ Audits the project's build and CI configuration across six pillars: CI config pr
 ## Purpose
 
 Weak CI pipelines ship bugs, leak secrets, and produce unreproducible builds. A missing lockfile means dependency resolution varies between machines. Docker images running as root escalate container escapes to host compromises. CI without lint/typecheck/test steps means the green checkmark is meaningless. This skill catches these gaps before they reach production.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

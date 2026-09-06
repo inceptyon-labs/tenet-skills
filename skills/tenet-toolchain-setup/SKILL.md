@@ -1,7 +1,7 @@
 ---
 name: tenet-toolchain-setup
 description: "Sets up Tenet static-analysis tools and generates .healthcheck.toml for a project."
-when_to_use: "First time running Tenet, setting up healthcheck, refreshing toolchain config, tenet setup, tenet init, tenet-orchestrator --setup"
+when_to_use: "First time running Tenet, setting up healthcheck, refreshing toolchain config, tenet setup, tenet init"
 disable-model-invocation: true
 model: sonnet
 allowed-tools: Bash Read Write Glob Grep
@@ -214,6 +214,18 @@ axe = "auto"
 pa11y = "auto"
 markdownlint = "auto"
 tflint = "auto"
+
+[models]
+# Which model runs each dimension subagent. The orchestrator spawns one isolated agent per
+# dimension and passes the model name through to the Agent tool. Swap `judge` when a newer
+# frontier model ships; no skill files change.
+judge  = "fable"    # correctness, security, solid, api-contract, privacy-data, errors, performance
+worker = "sonnet"   # complexity, dependencies, debt, testing, docs, accessibility, secrets,
+                    # observability, build-ci, supply-chain-license, infra-cloud,
+                    # database-migrations, release-ops, toolchain
+# Per-dimension override:
+# [dimensions.security]
+# model = "opus"
 
 [weights]
 security = 1.5

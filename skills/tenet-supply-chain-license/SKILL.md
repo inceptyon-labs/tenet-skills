@@ -1,14 +1,27 @@
 ---
 name: tenet-supply-chain-license
 description: "Audits dependency provenance, lockfiles, action/image pinning, licenses, and supply-chain risk."
-when_to_use: "Supply chain audit, SBOM check, license compliance, provenance, dependency confusion, pinned actions, tenet supply-chain-license"
+when_to_use: "tenet supply-chain-license, tenet-supply-chain-license dimension, Tenet supply chain and license audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-supply-chain-license."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
 # Tenet Supply Chain & License
 
 Audits whether build inputs are traceable, pinned, licensed intentionally, and resistant to common supply-chain attacks.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

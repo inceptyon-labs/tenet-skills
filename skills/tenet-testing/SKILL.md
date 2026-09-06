@@ -1,8 +1,9 @@
 ---
 name: tenet-testing
 description: "Audits test coverage, critical-path tests, flaky markers, and missing test categories."
-when_to_use: "Test coverage audit, test quality, flaky tests, missing tests, tenet testing"
+when_to_use: "tenet testing, tenet-testing dimension, Tenet test coverage and quality audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-testing."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ Evaluates the health of a project's test suite across six axes: coverage percent
 ## Purpose
 
 Test coverage percentages alone are misleading — a project can have 90% coverage while missing tests for authentication, payment processing, and data mutations. This skill evaluates not just how much is tested, but whether the right things are tested, whether the tests themselves are healthy (no committed `.only` or `.skip`), and whether the test strategy covers all necessary categories (unit, integration, E2E).
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

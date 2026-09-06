@@ -25,7 +25,7 @@ finding does not exist. Do not emit findings from a grep count alone.
 
 Quote the exact offending line(s) into the finding's `snippet` field (redacted per the
 dimension's rules — e.g. secrets are masked). If you cannot quote the specific line that is
-wrong, you have not verified it — drop it or demote to `info`.
+wrong, you have not verified it — drop it.
 
 ### 3. Trace controllability (for injection / SSRF / traversal / IDOR / XSS)
 
@@ -42,10 +42,14 @@ The vulnerability only exists if untrusted input actually reaches the sink. Walk
 
 Ask, in order, "what would make this NOT a real finding?" and check each:
 
-- Is it in a **test file, fixture, example, mock, or seed script**? → not production; demote
-  or drop per the dimension's test-file rule.
+- Is it in a **test file, fixture, example, mock, or seed script**? → not production; drop
+  unless the dimension's test-file rule says otherwise.
 - Is it **inside a comment or a docstring**? → not executable; drop.
-- Is it **dead code** (unexported, unreferenced, behind an unreachable flag)? → demote.
+- Is it **dead code** (unexported, unreferenced, behind an unreachable flag, a branch a
+  constant makes impossible)? → drop. Code that cannot run cannot have a bug. If the dead code
+  is itself a problem, that is a `tenet-debt` finding, not this dimension's.
+- Can the bad input **actually arrive here**? Is there an upstream validator, schema, type
+  constraint, or DB constraint that already rejects it? → drop.
 - Does a **framework or library guarantee** already neutralize it? (An ORM query builder
   parameterizes by default; React escapes JSX text by default; a validated DTO already ran.)
 - Is the "user input" actually **developer-controlled** (a literal, an enum, a config value)?
@@ -53,32 +57,46 @@ Ask, in order, "what would make this NOT a real finding?" and check each:
   (See `shared/security-calibration.md` for the flag / do-NOT-flag pairs.)
 
 If the finding survives every refutation attempt, keep it. If any refutation holds, drop it
-or demote it and record why.
+and note the reason in the worklog so you do not re-derive it.
 
 ### 5. Set confidence honestly
+
+`confidence` describes **how the finding was detected**, not whether it is real. Every finding
+in the report is real; the tier tells the reader what kind of evidence backs it.
 
 - Toolchain-confirmed (semgrep, gitleaks, tflint, eslint) → `deterministic`.
 - You read the code and traced controllability end to end → `native` (or `tree_sitter` if
   via AST query).
-- Pattern matched and it looks right but you could not fully confirm controllability →
-  `heuristic`, and prefer `major` over `critical` unless the sink is unambiguous.
+- The offending line is itself the defect and needs no data-flow trace (a hardcoded secret, an
+  empty catch, an unpinned action) but was found by grep in a language without native support
+  → `heuristic`.
+
+`heuristic` is **not** a bucket for "pattern matched but I could not confirm it." A candidate you
+could not confirm is dropped, not tagged.
 
 ---
 
 ## Calibration rule
 
-When a finding sits on the boundary between "real" and "false positive," the tie-breaker
-depends on severity and confidence:
+There is no tie-breaker for "might be real." A candidate is in one of two states:
 
-- **High-confidence, high-impact** (traced controllability into a dangerous sink on a
-  critical path): keep at full severity. Escalate per `shared/severity.md`.
-- **Low-confidence pattern match** you could not trace: keep it, but as `heuristic` and one
-  tier lower, and say "unverified — could not confirm the input is attacker-controlled" in
-  the description. Do not inflate an unproven pattern to `critical`.
-- **Refuted**: drop it. Do not emit a finding you have personally disproven "just in case."
+- **Confirmed**: you can state the concrete input or state, the line, the wrong behavior, and
+  why it is wrong, with the code open in front of you. Keep it at the severity its impact
+  earns per `shared/severity.md`.
+- **Not confirmed**: anything else, including "looks suspicious", "probably", "could not trace
+  the input", and "refuted". Drop it. Do not emit it as `info`, do not emit it one tier lower
+  with a disclaimer, do not keep it "just in case".
 
-The goal is a report where every `critical`/`major` is defensible line-by-line. A precise
-report of 6 real issues is worth more than a noisy report of 30 where 24 are wrong.
+Do not overthink confirmation. It means reading the line, its callers, and the guards between
+input and sink. It does not mean inventing multi-step scenarios to make a candidate work. If
+you find yourself building a story about how the bad input *might* arrive, stop; that candidate
+is not confirmed.
+
+Zero findings for a dimension is a legitimate, expected result on healthy code. Report the
+checks you ran as `passed` and move on.
+
+The goal is a report where every finding is defensible line-by-line. A precise report of 6
+real issues is worth more than a noisy report of 30 where 24 are wrong.
 
 ---
 

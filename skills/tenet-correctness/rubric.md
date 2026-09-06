@@ -1,8 +1,8 @@
 # Tenet Correctness — Rubric
 
 Logic-bug finding types the `tenet-correctness` skill produces. Unlike pattern-based rubrics,
-each of these requires **reading the code and stating a concrete failing input**. A finding with
-no "input X → wrong output Y" scenario is not confirmed — demote to `info` or drop.
+each of these requires **reading the code and stating a concrete failing input the system can
+actually receive**. A finding with no "input X → wrong output Y" scenario is not a finding; drop it.
 
 ## Scoring Formula
 
@@ -12,8 +12,8 @@ Floor 0, ceil 100, round to integer. Info findings do not affect score.
 ```
 
 Severity is by **impact**, not by pattern: silent data/money corruption or wrong auth logic on a
-critical path = critical; wrong result on a common input = major; edge-case-only or unverified =
-minor/info.
+critical path = critical; wrong result on a common input = major; wrong result only on a rare but
+reachable edge case = minor. Unverified candidates are not reported at any severity.
 
 ---
 
@@ -33,11 +33,14 @@ minor/info.
   slice/substring/pagination bounds, empty/single/last-element mishandling.
 - **Detection:** Trace empty, single-element, and last-index inputs.
 
-### CORR-DEAD-001: Unreachable / Always-True / Always-False Logic
+### CORR-DEAD-001: Guard That Never Fires / Always-True / Always-False Logic
 
 - **Severity:** major / minor
-- **Description:** A condition that can never be true (or is always true), an early return that
-  makes later code dead, a `switch` fallthrough, a constant condition.
+- **Description:** A condition that is always true or always false **so that an intended check
+  never runs on real input** (a validation that can't fail, an early return that skips work the
+  caller relies on, an accidental `switch` fallthrough). The finding is the missing behavior, not
+  the dead branch. Unreachable code by itself is `tenet-debt`, not a correctness bug; do not
+  report it here.
 - **Detection:** Read; semgrep/eslint `no-constant-condition`/`no-fallthrough` if present.
 
 ---

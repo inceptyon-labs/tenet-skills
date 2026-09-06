@@ -1,8 +1,9 @@
 ---
 name: tenet-correctness
-description: "Hunts logic and correctness bugs: off-by-one, inverted conditions, wrong-variable copy-paste, unawaited async, race conditions, null paths, and boundary errors on critical paths."
-when_to_use: "Code review, logic bug hunt, correctness audit, does this actually work, find bugs, tenet correctness"
-model: sonnet
+description: "Tenet correctness dimension: finds confirmed logic bugs (off-by-one, inverted conditions, wrong-variable copy-paste, unawaited async, races, null paths) on reachable critical paths."
+when_to_use: "tenet correctness, tenet-correctness dimension, Tenet logic-bug audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-correctness."
+disable-model-invocation: true
+model: opus
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -25,17 +26,38 @@ by **selecting a bounded set of high-risk code and reading it deliberately**, tr
 inputs. It does not attempt to read the whole repo — it spends its attention where a bug hurts
 most.
 
-## How to run this audit — read first
+## What counts as a bug here — read first
 
-Executed by a Sonnet-class model. The failure mode here is *shallow reading* — glancing at a
-function and declaring it fine. These protocols force depth over breadth:
+A correctness finding is code that, **given input or state this system can actually receive,
+produces a wrong result, a crash, or corrupted data**. Every one must be stated as:
 
-- **`shared/scan-discipline.md`** — grep hygiene, the worklog, anti-laziness (read every file in
-  the selected set, do not sample within it), systemic grouping.
+> "With input X, line N does Y. Y is wrong because Z."
+
+Filled in from the code in front of you, not from a story about what might happen. If you cannot
+fill it in, there is no finding. Specifically, these are **not** correctness bugs and must not be
+reported at any severity, including `info`:
+
+- Code that cannot execute: unreferenced functions, branches behind constants, dead flags.
+- Input that an upstream validator, schema, type, or DB constraint already stops.
+- Unusual behavior that the callers, tests, or docstring show is intended.
+- Hypotheticals about future changes, scale the app does not have, or callers that do not exist.
+- Anything you refuted while checking it.
+
+**Zero findings is a normal result.** Most well-tested functions you read will be correct. The
+checklist in Step 3 is a set of lenses to read through, not a quota; do not produce one candidate
+per lens to show you looked. **Do not overthink it.** Read the function, read its callers, decide.
+If confirming a candidate requires more than a few minutes of speculation, it is not confirmed.
+Drop it and move on.
+
+There are two opposite failure modes and both cost the same: **skimming** (declaring a function
+fine without tracing an input through it) and **inventing** (dressing a suspicion up as a bug to
+have something to report). These protocols guard both:
+
+- **`shared/scan-discipline.md`** — grep hygiene, the worklog, read every file in the selected
+  set, systemic grouping, and §2a "report only issues that actually exist".
 - **`shared/entry-points.md`** — the entry-point inventory feeds path selection (Step 2).
 - **`shared/verification.md`** — every bug must be traced to a concrete failing input and
-  survive a refutation pass before it ships (Step 5). This is what separates a real bug from
-  "this looks suspicious."
+  survive a refutation pass before it ships (Step 5).
 
 ## Language Support Matrix
 
@@ -91,8 +113,10 @@ this dimension explicitly does not claim whole-repo coverage, so state the scope
 
 ### Step 3: Read Each Selected Unit Deliberately
 
-For every function in the review set, actually read it and run these checks. Append candidates
-to `.healthcheck/tmp/correctness-worklog.md` as you find them.
+For every function in the review set, actually read it, trace one realistic input through it,
+and read it through the lenses below. Append candidates to `.healthcheck/tmp/correctness-worklog.md`
+as you find them, each with its one-sentence "input X → line N does Y → wrong because Z". A
+function that passes every lens gets a one-line "read, OK" entry in the worklog and nothing else.
 
 **a. Trace one concrete input end-to-end.** Pick a realistic input (and an empty one, and a
 boundary one) and mentally execute the function. Does the returned/written value match the
@@ -149,23 +173,24 @@ vs null, or throws vs returns an error.
 
 Per `shared/verification.md`, for every candidate:
 - State the **concrete failing input → wrong output/crash** in one sentence. If you cannot, it is
-  not a confirmed bug — demote to `info` ("suspicious, unverified") or drop.
+  not a bug. Drop it. Do not keep it as `info`.
 - Try to refute: is there an upstream guard, a validator, a type constraint, a DB constraint, or
   a framework guarantee that prevents the bad input from reaching this line? Is the path dead?
+  Does a test assert this behavior on purpose? Any yes → drop.
 - Quote the offending line(s) into `snippet`.
 
-Only bugs with a stated failing scenario that survive refutation ship at `major`/`critical`.
+Only bugs with a stated failing scenario that survive refutation ship, at any severity.
 
 ### Step 6: Score & Write Report
 
-Severity mapping:
+Severity mapping (all rows assume a confirmed bug; unconfirmed candidates were dropped in Step 5):
 
 | Impact | Severity |
 |---|---|
 | Silent data corruption, money/quantity error, auth/permission logic wrong, double-spend/double-write on a critical path | critical |
 | Incorrect result on a common/expected input path; crash on realistic input; race on shared state | major |
-| Bug only on an unusual edge case; wrong result in a non-critical path; unverified-but-plausible | minor |
-| Suspicious pattern you could not confirm reaches a bad state | info |
+| Wrong result only on a rare but reachable edge case, or in a non-critical path | minor |
+| (not used for bugs) A confirmed contract mismatch the current callers happen to tolerate, worth a conscious decision | info |
 
 Apply escalation from `shared/severity.md` (critical path, systemic across 5+ files). Then the
 standard formula:
@@ -212,12 +237,18 @@ Delete `.healthcheck/tmp/correctness-*.md` scratch files when done.
 | `deterministic` | Imported from semgrep/eslint correctness rule |
 | `native` | Traced the logic in a native-support language with a concrete failing input |
 | `tree_sitter` | AST-assisted read in a tree_sitter language |
-| `heuristic` | Suspicious pattern, failing input not fully confirmed |
+| `heuristic` | Traced with a concrete failing input in a heuristic-support language (less idiom awareness) |
+
+Confidence describes how the bug was found. It never means "not sure it is a bug"; those are dropped.
 
 ## Constraints
 
-- NEVER emit a `major`/`critical` without a concrete "input X → wrong output Y" scenario in the
-  `failure_scenario`/description and the offending line in `snippet`.
+- NEVER emit a finding at any severity without a concrete "input X → wrong output Y" scenario in
+  the description and the offending line in `snippet`.
+- NEVER report a bug on a path that cannot execute or with input that cannot arrive. Code that
+  can never run has no correctness bugs (dead code belongs to `tenet-debt`).
+- NEVER pad the report. Zero findings is a valid result; state what was reviewed in `notes` and
+  mark the checks `passed`.
 - NEVER claim whole-repo coverage. Always list what was reviewed and what was not in `notes`.
 - NEVER re-report issues owned by other dimensions as correctness: pure error-handling gaps →
   `tenet-errors`; security-exploitable logic (IDOR, injection) → `tenet-security`; slow-but-correct

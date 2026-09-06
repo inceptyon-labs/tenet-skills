@@ -1,8 +1,9 @@
 ---
 name: tenet-docs
 description: "Audits README/API docs, ADRs, changelog, documentation coverage, and freshness."
-when_to_use: "Documentation audit, README check, JSDoc coverage, API docs, tenet docs"
+when_to_use: "tenet docs, tenet-docs dimension, Tenet documentation audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-docs."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -18,6 +19,18 @@ Documentation is the load-bearing surface between the code and every future cont
 2. **Inline doc coverage** — Are exported/public symbols annotated with JSDoc, docstrings, or equivalent?
 3. **ADR/decision log presence** — For non-trivial projects, are architectural decisions recorded?
 4. **Changelog presence** — Is there a changelog or equivalent release history?
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

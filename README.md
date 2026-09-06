@@ -84,7 +84,7 @@ This will:
 
 This runs the full audit pipeline:
 1. Executes all available deterministic tools (semgrep, gitleaks, eslint, etc.)
-2. Runs applicable dimension skills
+2. Spawns one isolated subagent per applicable dimension, in parallel, on the model tier set in `[models]`
 3. Aggregates findings into a single report
 4. Uploads to the dashboard (or prints to stdout)
 
@@ -108,7 +108,7 @@ This runs the full audit pipeline:
 |---|---|---|
 | `tenet-toolchain-setup` | `/tenet-skills:tenet-toolchain-setup` | First-run concierge — detects tools, generates config |
 | `tenet-toolchain` | (called by orchestrator) | Runs deterministic tools, normalizes output |
-| `tenet-orchestrator` | `/tenet-skills:tenet-orchestrator` | Main entry point — coordinates all skills |
+| `tenet-orchestrator` | `/tenet-skills:tenet-orchestrator` | Main entry point — runs the toolchain, spawns one subagent per dimension, aggregates |
 
 ### Dimension Skills
 
@@ -156,6 +156,13 @@ checkov = "auto"
 tfsec = "auto"
 kube_linter = "auto"
 conftest = "auto"
+
+[models]
+judge  = "fable"         # Runs the judgment dimensions (correctness, security, solid,
+                         # api-contract, privacy-data, errors, performance)
+worker = "sonnet"        # Runs the toolchain-backed dimensions and the toolchain itself
+# [dimensions.security]
+# model = "opus"         # Per-dimension override
 
 [weights]
 security = 1.5           # Override dimension weight

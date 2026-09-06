@@ -1,8 +1,9 @@
 ---
 name: tenet-api-contract
 description: "Audits API consistency: schemas, errors, status codes, pagination, versioning, and idempotency."
-when_to_use: "API audit, REST consistency, OpenAPI check, GraphQL review, tRPC review, tenet api-contract"
+when_to_use: "tenet api-contract, tenet-api-contract dimension, Tenet API contract consistency audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-api-contract."
 model: opus
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -15,6 +16,18 @@ allowed-tools: Bash Read Grep Glob Write
 This skill audits the API layer of a project for design consistency and contract quality. A well-designed API follows predictable patterns: every resource returns the same response shape, error responses use a uniform schema, HTTP verbs map to their intended semantics, status codes are precise, and pagination follows a single strategy. This skill detects deviations from those principles and flags them as findings.
 
 APIs are the public contract of a service. Inconsistencies in response shapes, verb semantics, or status codes create integration friction, increase client-side error handling complexity, and signal a codebase where conventions are not enforced. This dimension catches those issues before they reach consumers.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

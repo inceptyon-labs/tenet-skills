@@ -71,9 +71,12 @@ In Python, use `int(score + 0.5)` or `math.floor(score + 0.5)` rather than the b
 
 ### Severity calibration guidance
 
-Err toward the harsher severity when a finding sits on the boundary. The scoring formula already accounts for the weight difference — a single `major` that should have been `critical` costs the project only 3 points of accuracy, but a `minor` that should have been `major` hides a real issue behind a nearly-invisible 0.5-point deduction. When in doubt, escalate.
+Severity describes the **confirmed impact** of a finding that you have already verified is real (see `shared/verification.md`). It is never a hedge for uncertainty. Two rules:
 
-Specific escalation triggers:
+1. **Uncertain whether it is real → it is not a finding.** Do not emit it at a lower severity "just in case". Doubt about existence is resolved by reading the code, not by picking `minor`.
+2. **Certain it is real, uncertain about impact → pick the severity whose description matches the concrete consequence you can state.** If you can state a data-loss or auth-bypass consequence, it is `critical`. If you can only state "this is a smell", it is `minor`.
+
+Escalation triggers apply only to confirmed findings and describe scope, not doubt:
 - An issue affecting an **entire app layer or package** (not just one file) → escalate one tier
 - An issue in a **critical path** (auth, payment, data mutation) → escalate one tier
 - An issue that is **systemic** (same pattern in 5+ files) → escalate one tier

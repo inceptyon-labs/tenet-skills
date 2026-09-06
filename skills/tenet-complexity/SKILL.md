@@ -1,8 +1,9 @@
 ---
 name: tenet-complexity
 description: "Measures function/file complexity, nesting, length, and maintainability thresholds."
-when_to_use: "Complexity audit, cyclomatic complexity, function length, nesting depth, tenet complexity"
+when_to_use: "tenet complexity, tenet-complexity dimension, Tenet code complexity audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-complexity."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
@@ -21,6 +22,18 @@ This skill evaluates the structural complexity of the codebase by measuring five
 5. **Function length** — total lines per function or method
 
 High complexity correlates with bugs, difficulty onboarding new developers, and resistance to safe refactoring. This dimension provides the quantitative foundation for technical debt decisions.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 

@@ -4,6 +4,7 @@ description: "Runs Tenet static-analysis tools and writes normalized outputs for
 when_to_use: "Called by tenet-orchestrator automatically. Can be invoked directly to re-run the deterministic toolchain layer without running specialist skills."
 user-invocable: false
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Write Glob Grep
 ---
 

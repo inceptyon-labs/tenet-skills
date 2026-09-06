@@ -1,14 +1,27 @@
 ---
 name: tenet-infra-cloud
 description: "Audits IaC and cloud risks: exposure, IAM wildcards, encryption, buckets, Kubernetes, and drift."
-when_to_use: "Infrastructure audit, cloud security, Terraform review, Kubernetes security, IAM policy, storage bucket exposure, tenet infra-cloud"
+when_to_use: "tenet infra-cloud, tenet-infra-cloud dimension, Tenet infrastructure and cloud audit. Run via /tenet-skills:tenet-orchestrator or directly with /tenet-skills:tenet-infra-cloud."
 model: sonnet
+disable-model-invocation: true
 allowed-tools: Bash Read Grep Glob Write
 ---
 
 # Tenet Infrastructure & Cloud
 
 Audits source-controlled infrastructure configuration for cloud and platform risks. This complements `tenet-security` by focusing on deployed infrastructure boundaries rather than application code.
+
+## Calibration — read first
+
+Follow `shared/scan-discipline.md` (complete every step, enumerate rather than sample, and §2a:
+report only issues that actually exist), `shared/verification.md` (every finding is confirmed
+against the code before it ships; unconfirmed candidates are dropped, not demoted), and
+`shared/severity.md` (severity is confirmed impact, never a hedge for doubt).
+
+A finding must exist in this codebase on a path that can run. Do not report hypotheticals, dead
+code, style preferences, or anything an upstream check already prevents. Zero findings for a step
+is the normal result on healthy code; do not fill a step to show you looked. Do not overthink it:
+read the code and its context, decide, move on.
 
 ## Language Support Matrix
 
