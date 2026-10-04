@@ -8,3 +8,6 @@ node_modules/
 
 # Ephemeral eval outputs — may contain real credentials from scanned projects
 tenet-skills-workspace/
+
+# Archify diagram output (local, regenerated on demand)
+.archify/

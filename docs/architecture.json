@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Tenet Skills Audit Pipeline",
+    "output": ".archify/architecture-tenet-skills-overview-20261003-201444/tenet-skills-overview.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "git@github.com:inceptyon-labs/tenet-skills.git",
+      "link_mode": "local-only",
+      "revision": "ffe05ada334b273a720aed337e0d62b99cb3b40f"
+    }
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "Developer", "sublabel": "Claude Code session", "pos": [40, 210], "size": [140, 64],
+      "sources": [{ "path": "README.md", "line": 63, "end_line": 89, "label": "Quick Start" }] },
+    { "id": "setup", "type": "backend", "label": "Toolchain Setup", "sublabel": "user-invoked skill", "pos": [40, 40], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-toolchain-setup/SKILL.md", "line": 12, "end_line": 16 }, { "path": "skills/tenet-toolchain-setup/SKILL.md", "line": 181, "end_line": 184, "label": "writes config" }] },
+    { "id": "config", "type": "database", "label": ".healthcheck.toml", "sublabel": "models, weights, tools", "pos": [260, 40], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-orchestrator/SKILL.md", "line": 87, "end_line": 91, "label": "halts without it" }, { "path": "skills/tenet-orchestrator/SKILL.md", "line": 144, "end_line": 152, "label": "models tiers" }] },
+    { "id": "orch", "type": "backend", "label": "Orchestrator", "sublabel": "plumbing on sonnet", "pos": [260, 210], "size": [150, 64], "tag": "entry point",
+      "sources": [{ "path": "skills/tenet-orchestrator/SKILL.md", "line": 1, "end_line": 21 }, { "path": "skills/tenet-orchestrator/SKILL.md", "line": 199, "end_line": 205, "label": "aggregates" }] },
+    { "id": "dash", "type": "external", "label": "Tenet Dashboard", "sublabel": "separate repo, bearer auth", "pos": [720, 210], "size": [160, 64],
+      "sources": [{ "path": "skills/tenet-orchestrator/SKILL.md", "line": 332, "end_line": 347, "label": "POST report" }, { "path": "shared/upload.sh", "line": 29, "end_line": 36 }] },
+    { "id": "tools", "type": "external", "label": "Static Analyzers", "sublabel": "semgrep, gitleaks, ...", "pos": [40, 380], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-toolchain/SKILL.md", "line": 79, "end_line": 100 }] },
+    { "id": "toolchain", "type": "backend", "label": "Toolchain Pass", "sublabel": "worker subagent", "pos": [260, 380], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-orchestrator/SKILL.md", "line": 93, "end_line": 102 }, { "path": "skills/tenet-toolchain/SKILL.md", "line": 138, "end_line": 165, "label": "normalizes" }] },
+    { "id": "dims", "type": "backend", "label": "Dimension Subagents", "sublabel": "20 specialists, parallel", "pos": [480, 380], "size": [170, 64], "tag": "judge/worker",
+      "sources": [{ "path": "skills/tenet-orchestrator/SKILL.md", "line": 165, "end_line": 183 }, { "path": "skills/tenet-security/SKILL.md", "line": 356, "end_line": 358, "label": "writes report" }] },
+    { "id": "shared", "type": "security", "label": "Shared Protocols", "sublabel": "shared/*.md rules", "pos": [740, 380], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-security/SKILL.md", "line": 24, "end_line": 41 }, { "path": "skills/tenet-orchestrator/SKILL.md", "line": 172, "end_line": 175 }] },
+    { "id": "ws", "type": "database", "label": ".healthcheck/", "sublabel": "toolchain + reports", "pos": [260, 550], "size": [150, 64],
+      "sources": [{ "path": "skills/tenet-toolchain/SKILL.md", "line": 164, "end_line": 165 }, { "path": "skills/tenet-orchestrator/SKILL.md", "line": 383, "end_line": 387, "label": "outputs" }] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "Agent session (subagents isolated)", "wraps": ["orch", "toolchain", "dims"] },
+    { "kind": "region", "label": "Audited repo checkout", "wraps": ["ws"] }
+  ],
+  "connections": [
+    { "id": "user-to-orch", "from": "user", "to": "orch", "label": "run audit", "variant": "emphasis" },
+    { "id": "user-to-setup", "from": "user", "to": "setup", "label": "first run", "variant": "dashed" },
+    { "id": "setup-to-config", "from": "setup", "to": "config", "label": "writes" },
+    { "id": "orch-to-config", "from": "orch", "to": "config", "label": "reads" },
+    { "id": "orch-to-toolchain", "from": "orch", "to": "toolchain", "label": "spawn", "variant": "emphasis" },
+    { "id": "toolchain-to-tools", "from": "toolchain", "to": "tools", "label": "runs" },
+    { "id": "toolchain-to-ws", "from": "toolchain", "to": "ws", "label": "writes toolchain/" },
+    { "id": "orch-to-dims", "from": "orch", "to": "dims", "label": "spawn per dimension", "variant": "emphasis" },
+    { "id": "dims-to-shared", "from": "dims", "to": "shared", "label": "reads rules" },
+    { "id": "dims-to-ws", "from": "dims", "to": "ws", "label": "writes reports/" },
+    { "id": "orch-to-dash", "from": "orch", "to": "dash", "label": "POST /api/v1/reports", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Primary path", "items": ["Developer runs the orchestrator", "Toolchain pass writes normalized findings to .healthcheck/toolchain/", "Dimension subagents read them and write reports/<dim>.json", "Orchestrator aggregates final-report.json, then uploads"] },
+    { "dot": "emerald", "title": "Model tiers", "items": ["judge tier (default fable): security, correctness, solid, api-contract, privacy-data, errors, performance", "worker tier (default sonnet): the other dimensions and the toolchain pass", "Set in .healthcheck.toml [models], not in skill files"] },
+    { "dot": "rose", "title": "Trust boundaries", "items": ["Subagents may not modify files outside .healthcheck/", "Orchestrator never reads specialist SKILL.md files into its own context", "Upload needs HEALTHCHECK_DASHBOARD_URL and HEALTHCHECK_API_TOKEN, else the report prints locally"] },
+    { "dot": "amber", "title": "Failure handling", "items": ["No .healthcheck.toml: orchestrator halts", "Rate limit: judge wave then worker wave, stop on 429", "Dimension fails twice: marked applicable false"] }
+  ]
+}
