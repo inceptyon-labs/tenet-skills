@@ -200,6 +200,9 @@ Each subagent writes its output to `.healthcheck/reports/{dimension}.json`. The 
 
 Read all dimension reports and aggregate into the final payload matching the schema in `shared/schema.json`:
 
+Set `orchestrator_version` from the plugin manifest, never from a remembered number:
+`jq -r .version "$PLUGIN_ROOT/.claude-plugin/plugin.json"`.
+
 ```json
 {
   "project": {
@@ -212,7 +215,7 @@ Read all dimension reports and aggregate into the final payload matching the sch
   "run": {
     "started_at": "<ISO-8601>",
     "completed_at": "<ISO-8601>",
-    "orchestrator_version": "1.1.1",
+    "orchestrator_version": "<version from $PLUGIN_ROOT/.claude-plugin/plugin.json>",
     "dimensions_run": ["security", "complexity", ...],
     "toolchain_summary": { ... },
     "lines_of_code": 18420,
