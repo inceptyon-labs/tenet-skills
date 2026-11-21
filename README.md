@@ -144,6 +144,9 @@ The config file at your project root controls which tools run and how dimensions
 [project]
 slug = "my-project"
 name = "My Project"
+# scale = "solo"         # "solo" | "team". Optional; detected from the repo when unset.
+                         # At solo scale, missing-process findings (no runbook, no SBOM,
+                         # no staging) are info. See shared/project-scale.md.
 
 [toolchain]
 semgrep = "auto"         # "auto" | "required" | "off"

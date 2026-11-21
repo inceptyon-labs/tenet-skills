@@ -43,9 +43,19 @@ Consume these files when present:
 
 ### Step 0: Detect Ecosystems
 
-Check for manifests and lockfiles: `package.json`, lockfiles, `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`, `build.gradle`, Dockerfiles, and `.github/workflows`.
+Check for manifests and lockfiles: `package.json`, lockfiles, `pyproject.toml`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`, `build.gradle`, `Package.swift`, `Podfile`, `pubspec.yaml`, `Gemfile`, Dockerfiles, and `.github/workflows`.
+
+```bash
+git ls-files -- '*package.json' '*package-lock.json' '*pnpm-lock.yaml' '*yarn.lock' '*bun.lock*' '*pyproject.toml' '*requirements*.txt' '*poetry.lock' '*uv.lock' '*go.mod' '*go.sum' '*Cargo.toml' '*Cargo.lock' '*Package.swift' '*Package.resolved' '*Podfile' '*Podfile.lock' '*pubspec.yaml' '*pubspec.lock' '*Gemfile' '*Gemfile.lock' '*Dockerfile*' '.github/workflows/*' ':!*node_modules/*' | head -80
+```
+
+Pair each manifest with its lockfile from this list. An Xcode app that uses Swift packages keeps
+`Package.resolved` inside the `.xcodeproj` or `.xcworkspace`; look there before calling it missing.
 
 If no dependency manifests, container files, or CI workflow files exist, mark `applicable: false`.
+
+**Project scale.** Classify the project per `shared/project-scale.md` before scoring anything. Findings
+marked *(scaled)* below are `info` at `solo` scale and keep the listed severity at `team` scale.
 
 ### Step 1: Lockfile and Reproducibility
 
@@ -61,6 +71,12 @@ Severity:
 Check:
 - GitHub Actions pinned to full commit SHA rather than mutable tags
 - Docker base images pinned by digest
+
+```bash
+git grep -nP "^\s*-?\s*uses:\s*(?!\./)[\w.-]+/[\w./-]+@(?![0-9a-f]{40}\b)" -- '.github/workflows/*' '*action.yml' '*action.yaml'
+git grep -nP "^\s*FROM\s+(?!scratch)(?!.*@sha256:)\S+" -- '*Dockerfile*'
+```
+
 - Package manager config for private scopes/registries
 - `npm publishConfig`, `.npmrc`, `pip.conf`, `poetry` sources for dependency confusion risk
 - Commit provenance: whether recent commits are cryptographically signed (GPG/SSH/Sigstore). Heuristic check:
@@ -79,8 +95,8 @@ Severity:
 Look for generated SBOMs or CI steps using Syft, CycloneDX, SPDX, Trivy SBOM, or equivalent.
 
 Severity:
-- `major`: deployable app/container has no SBOM generation evidence
-- `minor`: SBOM exists but is not generated in CI/release
+- `major`: deployable app/container has no SBOM generation evidence *(scaled)*
+- `minor`: SBOM exists but is not generated in CI/release *(scaled)*
 - `info`: SBOM generated but not archived as a release artifact
 
 ### Step 4: License Risk
@@ -90,7 +106,7 @@ Use available tool output first. Otherwise inspect package manifests for license
 Also confirm the repository declares its own license — a `LICENSE`/`LICENSE.md`/`LICENCE`/`COPYING` file in the root, or a `license` field in the primary manifest (`package.json`, `pyproject.toml`, `Cargo.toml`, etc.). Without one, reuse terms are legally undefined ("all rights reserved" by default).
 
 Severity:
-- `critical`: AGPL/GPL dependency appears in distributed proprietary product path without documented approval
+- `critical`: AGPL/GPL dependency appears in distributed proprietary product path without documented approval. First read the repository's own license: when the project is itself released under GPL or AGPL, a copyleft dependency under a compatible license is expected and is not a finding
 - `major`: unknown/missing licenses in runtime dependencies
 - `minor`: weak license metadata in dev-only dependencies; or a public/distributed project (git remote, published package, or open-sourced) has no LICENSE file and no license metadata
 - `info`: license policy file is missing; or a private/internal project has no LICENSE file

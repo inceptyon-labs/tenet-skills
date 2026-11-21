@@ -37,7 +37,7 @@ This dimension applies when any of the following file types are present in the p
 
 Check via the language census or direct file search:
 ```bash
-git ls-files | grep -E '\.(html?|jsx|tsx|vue|svelte)$' | head -1
+git ls-files -- '*.html' '*.htm' '*.jsx' '*.tsx' '*.vue' '*.svelte' | head -1
 ```
 
 If no matching files exist, write a non-applicable report:
@@ -46,7 +46,7 @@ If no matching files exist, write a non-applicable report:
   "key": "accessibility",
   "score": null,
   "weight": 0.8,
-  "skill_version": "1.0.0",
+  "skill_version": "1.0.1",
   "applicable": false,
   "notes": "No HTML, JSX, TSX, Vue, or Svelte files found. Accessibility dimension skipped."
 }
@@ -132,7 +132,7 @@ Regardless of whether toolchain output exists, perform source-level scans. These
 **2a. Build file list:**
 
 ```bash
-git ls-files | grep -E '\.(html?|jsx|tsx|vue|svelte)$'
+git ls-files -- '*.html' '*.htm' '*.jsx' '*.tsx' '*.vue' '*.svelte'
 ```
 
 Exclude files matching `skip_patterns` from config.
@@ -254,7 +254,7 @@ Write the dimension report to `.healthcheck/reports/accessibility.json`:
   "key": "accessibility",
   "score": 65,
   "weight": 0.8,
-  "skill_version": "1.0.0",
+  "skill_version": "1.0.1",
   "applicable": true,
   "notes": "Found 12 accessibility issues across 8 files. 3 images missing alt text, 2 icon buttons without ARIA labels, 4 heading hierarchy skips, 2 form inputs without labels, 1 missing lang attribute on <html>. axe-core provided 5 deterministic findings; 7 from source-level scan.",
   "metrics": {

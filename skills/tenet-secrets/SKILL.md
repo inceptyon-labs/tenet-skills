@@ -139,49 +139,62 @@ Even with gitleaks, some patterns benefit from explicit scanning. Search all com
 
 ```bash
 # AWS Access Key ID (starts with AKIA)
-git grep -nE "AKIA[0-9A-Z]{16}"# AWS Secret Access Key (40-char base64)
-git grep -nE "(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}"```
+git grep -nP "AKIA[0-9A-Z]{16}"
+# AWS Secret Access Key (40-char base64)
+git grep -nP "(aws_secret_access_key|AWS_SECRET_ACCESS_KEY)\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{40}"
+```
 
 #### GitHub Tokens
 
 ```bash
 # GitHub personal access tokens (classic and fine-grained)
-git grep -nE "(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|ghr_[A-Za-z0-9]{36})"```
+git grep -nP "(ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|ghr_[A-Za-z0-9]{36})"
+```
 
 #### Generic API Keys and Tokens
 
 ```bash
 # API keys in assignment or config
-git grep -nE "(api[_-]?key|api[_-]?secret|api[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{20,}"# Bearer tokens hardcoded
-git grep -nE "Bearer\s+[A-Za-z0-9_\-\.]{20,}"```
+git grep -nP "(api[_-]?key|api[_-]?secret|api[_-]?token)\s*[:=]\s*['\"][A-Za-z0-9_\-]{20,}"
+# Bearer tokens hardcoded
+git grep -nP "Bearer\s+[A-Za-z0-9_\-\.]{20,}"
+```
 
 #### Database Connection Strings with Passwords
 
 ```bash
 # PostgreSQL / MySQL / MongoDB connection strings
-git grep -nE "(postgres|mysql|mongodb)://[^:]+:[^@]+@"# Redis with password
-git grep -nE "redis://:[^@]+@"```
+git grep -nP "(postgres|mysql|mongodb)://[^:]+:[^@]+@"
+# Redis with password
+git grep -nP "redis://:[^@]+@"
+```
 
 #### Private Keys
 
 ```bash
 # PEM-encoded private keys
-git grep -lE "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----"```
+git grep -lP -e "-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----"
+```
 
 #### JWT Secrets
 
 ```bash
 # JWT secret in config
-git grep -nE "(jwt[_-]?secret|JWT_SECRET|jwt[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}"```
+git grep -nP "(jwt[_-]?secret|JWT_SECRET|jwt[_-]?key)\s*[:=]\s*['\"][^'\"]{8,}"
+```
 
 #### Slack/Stripe/SendGrid/Twilio Tokens
 
 ```bash
 # Slack
-git grep -nE "xox[baprs]-[A-Za-z0-9\-]{10,}"# Stripe
-git grep -nE "(sk_live|rk_live)_[A-Za-z0-9]{20,}"# SendGrid
-git grep -nE "SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}"# Twilio
-git grep -nE "SK[0-9a-fA-F]{32}"```
+git grep -nP "xox[baprs]-[A-Za-z0-9\-]{10,}"
+# Stripe
+git grep -nP "(sk_live|rk_live)_[A-Za-z0-9]{20,}"
+# SendGrid
+git grep -nP "SG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}"
+# Twilio
+git grep -nP "SK[0-9a-fA-F]{32}"
+```
 
 For each regex match:
 1. Check if it was already found by gitleaks/trufflehog — skip if so
@@ -253,11 +266,11 @@ For secrets found only in git history (not in current HEAD):
 
 ```bash
 # Math.random used for tokens/secrets/IDs
-git grep -nE "Math\.random\(\)" -- '*.ts' '*.js' '*.tsx' '*.jsx'
+git grep -nP "Math\.random\(\)" -- '*.ts' '*.js' '*.tsx' '*.jsx'
 # Python random for tokens
-git grep -nE "random\.(choice|randint|random|sample)\(" -- '*.py'
+git grep -nP "random\.(choice|randint|random|sample)\(" -- '*.py'
 # Go math/rand for tokens
-git grep -nE "math/rand" -- '*.go'
+git grep -nP "math/rand" -- '*.go'
 ```
 
 For each match:

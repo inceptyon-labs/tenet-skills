@@ -15,12 +15,27 @@ A bare `grep -rn PATTERN .` matches `node_modules/`, `dist/`, `build/`, `vendor/
 blows the context window before the scan is half done, and buries real findings. **Do not
 do this.**
 
-**Default to `git grep`** — it only searches tracked files, respects `.gitignore`, and is
+**Default to `git grep -P`** — it only searches tracked files, respects `.gitignore`, and is
 fast:
 
 ```bash
-git grep -nE "PATTERN" -- '*.ts' '*.tsx' '*.js'
+git grep -nP "PATTERN" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
+
+**Use `-P` (Perl regex), not `-E`, for any pattern containing `\b`, `\s`, `\d` or `\w`.** On
+macOS, `git grep -E` reads those as the plain letters b, s, d and w. The command still exits
+cleanly and prints fewer matches or none, so a broken pattern looks like a clean result. `-E` is
+safe only with POSIX classes (`[[:space:]]`, `[0-9]`, `[[:alnum:]_]`). If `-P` fails with "cannot
+use Perl-compatible regexes", rewrite the pattern with `-E` and POSIX classes; do not drop the
+check.
+
+**Never hard-code a source directory.** Many repos have no root `src/` (`server/`, `client/src/`,
+`apps/*/`, `lib/`, `Sources/`). A search aimed at a directory that does not exist prints nothing,
+and nothing reads as "no findings". Select files by extension with a pathspec, as above. To leave
+out tests, add exclusions: `':!*.test.*' ':!*.spec.*' ':!**/__tests__/**'`. To list files, use
+`git ls-files -- '<pathspec>'`, not `find .`, which walks `node_modules`.
+
+**List `.tsx` and `.jsx` explicitly.** The pathspec `'*.ts'` does not match `.tsx` files.
 
 When you must use plain `grep` (e.g. scanning untracked files), always exclude noise:
 

@@ -45,6 +45,10 @@ support:
     - nestjs
     - hono
     - koa
+    - sveltekit
+    - fastapi
+    - tauri-commands
+    - electron-ipc
   tree_sitter:
     - spring-boot
     - gin
@@ -71,6 +75,13 @@ This skill is applicable when ANY of the following are detected:
 5. **NestJS controllers** — `@Controller`, `@Get()`, `@Post()` decorators
 6. **OpenAPI/Swagger specs** — `openapi.yaml`, `openapi.json`, `swagger.yaml`, `swagger.json`
 7. **GraphQL schemas** — `.graphql` files, `typeDefs`, `gql` tagged templates
+8. **SvelteKit endpoints** — `+server.ts` / `+server.js` files
+9. **FastAPI and Go routers** — `@app.get(`, `@router.post(`, `.HandleFunc(`, gin/echo/chi route calls
+10. **Desktop IPC commands** — `#[tauri::command]`, `ipcMain.handle(`
+
+A mobile or desktop app that only **consumes** someone else's API has no API surface of its own
+and is not applicable. If the same repo also contains the server it talks to, the dimension is
+applicable and Step 9 checks the two sides against each other.
 
 If none of these are detected, write the dimension report with `applicable: false` and `score: null`.
 
@@ -84,42 +95,32 @@ However, if `.healthcheck/toolchain/eslint.json` exists, check for any ESLint fi
 
 ### Step 1: Detect API Framework and Enumerate Routes
 
-Scan the codebase to identify which API framework(s) are in use and build a route inventory.
+Identify which API framework(s) are in use and build a route inventory. **Use the enumeration
+recipes in `shared/entry-points.md`** for every stack present: Express/Fastify/Koa, Hono, tRPC,
+Next.js (App Router, Pages, server actions), SvelteKit, FastAPI/Flask/Django and Go. This
+dimension needs the route list from those recipes, not the auth table that file also describes.
+Enumerate every route; a route that is not in the inventory is not checked by any later step.
 
-**For Express/Fastify/Koa/Hono:**
+Recipes for surfaces that file does not cover:
+
+**Django REST Framework:**
 ```bash
-# Find route definitions
-grep -rn "app\.\(get\|post\|put\|patch\|delete\)\s*(" src/ routes/ --include="*.ts" --include="*.js"
-grep -rn "router\.\(get\|post\|put\|patch\|delete\)\s*(" src/ routes/ --include="*.ts" --include="*.js"
+git grep -nP "@api_view|class\s+\w+\((\w+\.)?\w*(ViewSet|APIView)\b" -- '*.py'
 ```
 
-**For Next.js API routes:**
+**NestJS:**
 ```bash
-# App Router
-find . -path "*/app/*/route.ts" -o -path "*/app/*/route.js"
-# Pages Router
-find . -path "*/pages/api/*.ts" -o -path "*/pages/api/*.js"
+git grep -nP "@(Controller|Get|Post|Put|Patch|Delete)\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
-**For Flask:**
+**Desktop IPC (Tauri, Electron).** Commands the UI calls are an API surface with the same
+consistency concerns:
 ```bash
-grep -rn "@app\.route\|@blueprint\.route" --include="*.py"
+git grep -nP "#\[tauri::command" -- '*.rs'
+git grep -nP "ipcMain\.(handle|on)\s*\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
-
-**For Django/DRF:**
-```bash
-grep -rn "urlpatterns\|@api_view\|class.*ViewSet\|class.*APIView" --include="*.py"
-```
-
-**For tRPC:**
-```bash
-grep -rn "createTRPCRouter\|publicProcedure\|protectedProcedure" --include="*.ts" --include="*.js"
-```
-
-**For NestJS:**
-```bash
-grep -rn "@Controller\|@Get\|@Post\|@Put\|@Patch\|@Delete" --include="*.ts"
-```
+For these, Steps 2 and 3 apply (return shapes and error shapes across commands). Skip the HTTP
+steps (4 to 8) and mark their checks `skipped`.
 
 Build a route table:
 
@@ -275,6 +276,37 @@ For collection endpoints that return lists, check pagination:
 - If an OpenAPI spec exists, check whether routes in code match the spec
 - Flag undocumented endpoints or spec-only endpoints that don't exist in code
 
+**Client/server contract drift (only when both live in this repo):**
+
+When the repo holds a server and a client that calls it (a web or mobile app next to its API, a
+Tauri UI next to its Rust commands), the client's idea of each response is a second copy of the
+contract, and the two drift. Find the client's models and calls:
+
+```bash
+git grep -nP "struct\s+\w+\s*:\s*[\w, ]*(Codable|Decodable)\b|enum\s+CodingKeys" -- '*.swift'
+git grep -nP "factory\s+\w+\.fromJson\(|_\$\w+FromJson\(" -- '*.dart'
+git grep -nP "\b(fetch|axios\.\w+|ky\.\w+|\$fetch|invoke)\s*(<[^>]+>)?\s*\(\s*['\"\`]" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.svelte' '*.vue' ':!*.test.*' ':!*.spec.*'
+```
+
+For each client call that maps to a route in the Step 1 inventory, read the handler's response and
+the client type side by side:
+
+- A field the client requires (non-optional Swift property, non-nullable Dart field, a TypeScript
+  field read without a guard) that the server omits, renames, or returns as `null` on some path.
+  In Swift and Dart this fails the whole decode at runtime.
+- A type mismatch (string ID on one side, number on the other; ISO date string decoded as a
+  timestamp).
+- An enum case the server can send that the client does not handle.
+- A client calling a path, method or command name that no handler registers.
+
+Each needs the usual sentence: "the handler at `file:line` returns X; the client at `file:line`
+expects Y; the request that produces X is Z." Report it at the client line with the server line in
+the description. A shared, generated type (OpenAPI codegen, tRPC, a shared package imported by
+both sides) makes drift impossible for the fields it covers; note it and skip those.
+
+**Severity:** major when a reachable response fails to decode or the call can never succeed;
+minor when the mismatch is tolerated today (an optional field the server never sends).
+
 ### Step 10: Score and Write Report
 
 Apply the standard scoring formula:
@@ -293,7 +325,7 @@ Write the dimension report to `.healthcheck/reports/api-contract.json`:
   "key": "api-contract",
   "score": 78,
   "weight": 1.0,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "applicable": true,
   "notes": "Examined 24 route handlers across 6 resources. Found inconsistent response shapes in /api/users and /api/orders, GET handler with database writes, and POST returning 200 instead of 201.",
   "metrics": {

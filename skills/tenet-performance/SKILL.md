@@ -32,11 +32,12 @@ read the code and its context, decide, move on.
 ```yaml
 support:
   native: [typescript, javascript, python]
-  heuristic: [go, java, ruby]
+  heuristic: [go, java, ruby, swift, dart, rust]
   skip: [yaml, json, markdown, css, html, shell, terraform, dockerfile]
 ```
 
 - **Native** (TS/JS/Python): Pattern matching with high confidence on async/await, ORM calls, React hooks, bundle config, event listener patterns.
+- **Platform** (Swift/SwiftUI, Dart/Flutter, Rust/Tauri): Steps 7b to 7d. Grep finds the candidate; every finding is confirmed by reading the code around it.
 - **Heuristic** (Go/Java/Ruby): Grep-based detection of common patterns (database calls in loops, missing pagination). Lower confidence — all findings tagged `"confidence": "heuristic"`.
 
 ## Toolchain Inputs
@@ -64,7 +65,7 @@ Scan for loops that contain awaited database or network calls. This is the highe
 **TypeScript / JavaScript:**
 ```bash
 # Pattern: for/forEach/map loop containing await + DB call
-grep -rn "for\s*(" --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" | \
+git grep -nP "for\s*\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
   # Then check the loop body (next ~20 lines) for await + DB call patterns
 ```
 
@@ -81,7 +82,7 @@ Also check for `Promise.all(arr.map(async` wrapping individual DB calls — this
 ```bash
 # Pattern: for loop body containing ORM call
 # Look for: for x in queryset / for x in items followed by Model.objects / session.query
-grep -rn "for .* in " --include="*.py" | \
+git grep -nP "for .* in " -- '*.py'
   # Then check for .objects. / session.query / cursor.execute in the loop body
 ```
 
@@ -101,8 +102,7 @@ Detect synchronous/blocking I/O calls that should be asynchronous.
 **TypeScript / JavaScript:**
 ```bash
 # Sync filesystem calls in non-config/non-setup files
-grep -rn "readFileSync\|writeFileSync\|existsSync\|readdirSync\|statSync\|mkdirSync\|appendFileSync" \
-  --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "readFileSync|writeFileSync|existsSync|readdirSync|statSync|mkdirSync|appendFileSync" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
 Exclude files that are clearly setup/build/config:
@@ -113,7 +113,7 @@ Exclude files that are clearly setup/build/config:
 **Python:**
 ```bash
 # Blocking calls in async functions
-grep -rn "def async\|async def" --include="*.py" | \
+git grep -nP "def async|async def" -- '*.py'
   # Then check for: open(), requests.get/post, time.sleep, subprocess.run
 ```
 
@@ -126,13 +126,13 @@ Scan for database queries that fetch unlimited rows — these are time bombs tha
 **All languages:**
 ```bash
 # SELECT * without WHERE or LIMIT
-grep -rn "SELECT \*" --include="*.ts" --include="*.js" --include="*.py" --include="*.go" --include="*.java" --include="*.rb"
+git grep -nP "SELECT \*" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.java' '*.rb'
 # Check for absence of WHERE / LIMIT / OFFSET / TOP in the same query string
 
 # ORM calls without limits
-grep -rn "\.findAll(\s*)" --include="*.ts" --include="*.js"  # Empty findAll
-grep -rn "\.find(\s*{\s*})" --include="*.ts" --include="*.js"  # find({}) with no limit
-grep -rn "Model\.objects\.all()" --include="*.py"  # Django all() without [:N]
+git grep -nP "\.findAll\(\s*\)" -- '*.ts' '*.tsx' '*.js' '*.jsx'  # Empty findAll
+git grep -nP "\.find\(\s*\{\s*\}\)" -- '*.ts' '*.tsx' '*.js' '*.jsx'  # find({}) with no limit
+git grep -nP "Model\.objects\.all\(\)" -- '*.py'  # Django all() without [:N]
 ```
 
 Also flag:
@@ -168,20 +168,19 @@ Scan for common memory leak patterns.
 **TypeScript / JavaScript:**
 ```bash
 # addEventListener without corresponding removeEventListener
-grep -rn "addEventListener" --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "addEventListener" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 # Check if the same file has a matching removeEventListener for each add
 
 # setInterval without clearInterval
-grep -rn "setInterval" --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "setInterval" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 # Check if the returned ID is stored and cleared
 
 # Unbounded caches / Maps that grow without eviction
-grep -rn "new Map()\|new Set()\|const cache\|let cache\|var cache" \
-  --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "new Map\(\)|new Set\(\)|const cache|let cache|var cache" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 # Flag if module-level (not inside a function) and no .delete() or .clear() in the same file
 
 # Global/module-level array push without cleanup
-grep -rn "\.push(" --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "\.push\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 # Flag if pushing to a module-level array with no splice/pop/length=0
 ```
 
@@ -198,7 +197,7 @@ Read useEffect bodies (within ~15 lines of `useEffect(`) and flag if `addEventLi
 # Unbounded lists/dicts at module level
 # Threads without daemon=True
 # open() without with statement (file handle leak)
-grep -rn "open(" --include="*.py" | grep -v "with open"
+git grep -nP "open\(" -- '*.py' | grep -v "with open"
 ```
 
 **Severity:** `major` for addEventListener without cleanup in components, setInterval without clear in long-lived modules. `minor` for module-level caches without eviction (may be intentional).
@@ -229,8 +228,7 @@ Skip this step if no frontend framework detected in Step 0.
 # Vite: look for build.rollupOptions.output.manualChunks in vite.config.*
 # Next.js: check for next/dynamic imports
 # React.lazy: check for React.lazy / lazy( usage
-grep -rn "splitChunks\|manualChunks\|React\.lazy\|next/dynamic\|import(" \
-  --include="*.config.js" --include="*.config.ts" --include="*.tsx" --include="*.jsx" --include="*.ts" --include="*.js"
+git grep -nP "splitChunks|manualChunks|React\.lazy|next/dynamic|import\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
 Flag if:
@@ -246,17 +244,17 @@ Skip this step if React is not detected in Step 0.
 ```bash
 # Inline object props — creates new reference every render
 # Pattern: <Component prop={{ ... }} /> or <Component prop={[ ... ]} />
-grep -rn "={\s*{" --include="*.tsx" --include="*.jsx"
-grep -rn "={\s*\[" --include="*.tsx" --include="*.jsx"
+git grep -nP "=\{\s*\{" -- '*.tsx' '*.jsx'
+git grep -nP "=\{\s*\[" -- '*.tsx' '*.jsx'
 
 # Inline function props — creates new function every render
 # Pattern: <Component onClick={() => ...} /> (but NOT in event handlers of native elements)
-grep -rn "={\s*(" --include="*.tsx" --include="*.jsx"
-grep -rn "={\s*function" --include="*.tsx" --include="*.jsx"
+git grep -nP "=\{\s*\(" -- '*.tsx' '*.jsx'
+git grep -nP "=\{\s*function" -- '*.tsx' '*.jsx'
 
 # Missing useMemo on expensive computations
 # Look for .filter().map(), .sort(), .reduce() chains NOT wrapped in useMemo
-grep -rn "\.filter(.*\.map(\|\.sort(.*\.map(\|\.reduce(" --include="*.tsx" --include="*.jsx"
+git grep -nP "\.filter\(.*\.map\(|\.sort\(.*\.map\(|\.reduce\(" -- '*.tsx' '*.jsx'
 # Check if the result is wrapped in useMemo
 
 # Missing useCallback on functions passed as props to child components
@@ -269,6 +267,97 @@ Apply these filters to reduce false positives:
 - Only flag `.filter().map()` chains if they operate on arrays of >0 estimated size (heuristic: check if the source is state or props, not a small constant)
 
 **Severity:** `minor` for inline object/function props on custom components. `major` for expensive computation chains (sort/filter/reduce on large data) without useMemo in components that re-render frequently (check if parent passes changing props).
+
+### Step 7b: Swift and SwiftUI (Apple Platform Projects Only)
+
+Skip this step if the census shows no Swift. These checks find candidates; confirm each by
+reading the surrounding type before reporting it.
+
+```bash
+# Blocking I/O. On the main actor these freeze the UI for the length of the read or request.
+git grep -nP "(Data|String|NSData)\(contentsOf:|\.wait\(\)|DispatchSemaphore|Thread\.sleep|sleep\(" -- '*.swift' ':!*Tests*'
+
+# Formatters and decoders are expensive to create. Inside `body`, a cell, or a loop they are
+# rebuilt on every render or iteration.
+git grep -nP "\b(DateFormatter|NumberFormatter|ISO8601DateFormatter|MeasurementFormatter|JSONDecoder|JSONEncoder|NSRegularExpression)\(" -- '*.swift' ':!*Tests*'
+
+# Fetches. Look for one inside a loop (N+1) and for an unbounded @Query filtered in memory.
+git grep -nP "modelContext\.fetch\(|\.fetch\(\s*(FetchDescriptor|NSFetchRequest)|@Query\b|@FetchRequest\b" -- '*.swift' ':!*Tests*'
+
+# Long-lived callbacks that need tearing down.
+git grep -nP "Timer\.(scheduledTimer|publish)|NotificationCenter\.default\.(addObserver|publisher)|\.sink\s*\{|CADisplayLink\(" -- '*.swift' ':!*Tests*'
+```
+
+Read each hit and report only these:
+
+- **Blocking call on the main actor.** `Data(contentsOf:)` with a remote URL, a semaphore wait, or
+  a synchronous file read of unbounded size, reached from a view, a `@MainActor` type, or a UI
+  callback. A read of a small bundled file at launch is not a finding.
+- **Expensive object built per render.** A formatter, decoder or regex created inside `var body`,
+  a row view, or a `ForEach` closure. Created once as a `static let` or stored property is correct.
+- **Work in `body`.** Sorting, filtering or grouping a collection that is not trivially small,
+  directly in `body` or a computed property `body` reads. It reruns on every state change.
+- **Fetch per row.** `modelContext.fetch` or a relationship fault inside a loop or a row view. An
+  `@Query` with no predicate and no `fetchLimit` on a table that grows with use, narrowed
+  afterwards with `.filter` in Swift.
+- **Callback never torn down.** A repeating `Timer` with no `invalidate()`, a selector-based
+  observer or `CADisplayLink` with no removal, or a `.sink` or timer closure that captures `self`
+  strongly and is stored on `self` (a retain cycle, so the object and its work never stop).
+
+**Severity:** `major` for a blocking network call on the main actor, a fetch per row over a
+growing table, and a retain cycle on an object created repeatedly. `minor` for the rest.
+
+### Step 7c: Flutter and Dart (Flutter Projects Only)
+
+Skip this step if the census shows no Dart.
+
+```bash
+# A Future or Stream created inline in build() restarts on every rebuild.
+git grep -nP "(future|stream):\s*(?!_|widget\.|snapshot)\w[\w.]*\(" -- '*.dart' ':!*_test.dart'
+
+# Eagerly built lists.
+git grep -nP "\b(ListView|GridView)\(\s*$|children:\s*\[?\s*(\.\.\.)?\w[\w.]*\.map\(" -- '*.dart' ':!*_test.dart'
+
+# Objects that must be disposed or cancelled.
+git grep -nP "\b(AnimationController|TextEditingController|ScrollController|PageController|TabController|FocusNode|StreamController)\(|\.listen\(|Timer\.periodic\(" -- '*.dart' ':!*_test.dart'
+
+# Synchronous I/O and heavy decoding on the UI isolate.
+git grep -nP "\.(readAsStringSync|readAsBytesSync|readAsLinesSync|writeAsStringSync|writeAsBytesSync|existsSync|listSync)\(|\bjsonDecode\(" -- '*.dart' ':!*_test.dart'
+```
+
+Read each hit and report only these:
+
+- **Future or Stream created in `build`.** `FutureBuilder(future: fetchThing())` calls
+  `fetchThing` again on every rebuild. The future belongs in `initState`, a field or a provider.
+- **Eager list over unbounded data.** `ListView(children: items.map(...).toList())` or a `Column`
+  inside a scroll view, fed from a collection that grows with use. `ListView.builder` builds only
+  what is visible. A fixed handful of children is not a finding.
+- **Missing `dispose` or `cancel`.** A controller, focus node, stream subscription or periodic
+  timer created in a `State` with no matching `dispose()`/`cancel()` in that state's `dispose`.
+  Check the same class before reporting.
+- **Synchronous file I/O or large `jsonDecode` on the UI isolate**, reached from a widget or a
+  callback, on data whose size the app does not bound. Small config reads are not findings.
+
+**Severity:** `major` for a network Future created in `build` and for a leaked subscription or
+periodic timer on a screen that is opened repeatedly. `minor` for the rest.
+
+### Step 7d: Tauri Commands (Tauri Projects Only)
+
+Skip this step if no `#[tauri::command]` exists.
+
+```bash
+git grep -nP "#\[tauri::command" -- '*.rs'    # then read the fn declared under each
+git grep -nP "std::thread::sleep|std::fs::|\.blocking_|reqwest::blocking|Command::new\(.*\.output\(\)" -- '*.rs'
+```
+
+A command declared as a plain `fn` (not `async fn`, and not `#[tauri::command(async)]`) runs on the
+main thread, so file, network or subprocess work inside it freezes the window until it returns.
+Report a synchronous command whose body does such work. In an `async fn` command, report blocking
+calls (`std::thread::sleep`, `reqwest::blocking`, a long `std::fs` walk) made without
+`spawn_blocking`, since they stall the async runtime the other commands share.
+
+**Severity:** `major` when the blocking work is unbounded (network, a directory walk, a
+subprocess); `minor` for a bounded local read.
 
 ### Step 8: Compile Findings
 
@@ -306,7 +395,7 @@ Write `.healthcheck/reports/performance.json`:
   "key": "performance",
   "score": 74,
   "weight": 1.0,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "notes": "Scanned 47 TypeScript files and 12 Python files. Found 3 N+1 query patterns, 2 unbounded queries, 4 memory leak risks, and 1 bundle size issue. Primary concern: N+1 queries in orderService.ts and userController.ts causing O(n) database round-trips per request.",
   "applicable": true,
   "metrics": {

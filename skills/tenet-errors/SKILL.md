@@ -82,49 +82,49 @@ Scan the codebase to build an inventory of all error handling constructs:
 **JavaScript/TypeScript:**
 ```bash
 # try/catch blocks
-grep -rn "catch\s*(" src/ --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "catch\s*\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 
 # Promise .catch() handlers
-grep -rn "\.catch(" src/ --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx"
+git grep -nP "\.catch\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 
 # Async error handling
-grep -rn "\.then(" src/ --include="*.ts" --include="*.js" | grep -v "\.catch("
+git grep -nP "\.then\(" -- '*.ts' '*.tsx' '*.js' '*.jsx' | grep -v "\.catch("
 
 # Error boundaries
-grep -rn "componentDidCatch\|ErrorBoundary\|getDerivedStateFromError" src/ --include="*.tsx" --include="*.jsx" --include="*.ts" --include="*.js"
+git grep -nP "componentDidCatch|ErrorBoundary|getDerivedStateFromError" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 
 # Global handlers
-grep -rn "process\.on.*unhandledRejection\|process\.on.*uncaughtException\|window\.onerror\|window\.addEventListener.*error" src/ --include="*.ts" --include="*.js"
+git grep -nP "process\.on.*unhandledRejection|process\.on.*uncaughtException|window\.onerror|window\.addEventListener.*error" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
 **Python:**
 ```bash
 # try/except blocks
-grep -rn "except" --include="*.py" | grep -v "test_\|_test\.py\|tests/"
+git grep -nP "except" -- '*.py' | grep -v "test_\|_test\.py\|tests/"
 
 # Bare except
-grep -rn "except:" --include="*.py"
+git grep -nP "except:" -- '*.py'
 
 # Broad except
-grep -rn "except Exception\b\|except BaseException" --include="*.py"
+git grep -nP "except Exception\b|except BaseException" -- '*.py'
 ```
 
 **Go:**
 ```bash
 # Error returns ignored
-grep -rn "_ = \|, _ :=\|, _ =" --include="*.go" | grep -v "_test\.go"
+git grep -nP "_ = |, _ :=|, _ =" -- '*.go' | grep -v "_test\.go"
 
 # Error not checked
-grep -rn "err :=" --include="*.go" | grep -v "if err"
+git grep -nP "err :=" -- '*.go' | grep -v "if err"
 ```
 
 **Java/Kotlin:**
 ```bash
 # Catch blocks
-grep -rn "catch\s*(" --include="*.java" --include="*.kt"
+git grep -nP "catch\s*\(" -- '*.java' '*.kt'
 
 # Broad catches
-grep -rn "catch\s*(Exception\|catch\s*(Throwable" --include="*.java" --include="*.kt"
+git grep -nP "catch\s*\(Exception|catch\s*\(Throwable" -- '*.java' '*.kt'
 ```
 
 ### Step 2: Detect Empty Catch Blocks
@@ -429,7 +429,7 @@ Write the dimension report to `.healthcheck/reports/errors.json`:
   "key": "errors",
   "score": 64,
   "weight": 1.3,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "applicable": true,
   "notes": "Examined 87 try/catch blocks and 34 Promise chains. Found 4 empty catch blocks, 6 unhandled Promise rejections, no error boundary in React app, and 12 fetch calls without timeout handling.",
   "metrics": {

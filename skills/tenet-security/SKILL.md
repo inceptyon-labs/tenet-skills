@@ -116,18 +116,18 @@ before treating it as a finding.
 
 ```bash
 # SQL — string concat / interpolation in query context
-git grep -nE "(query|execute|raw)\s*\(\s*[\`'\"].*(\+|\$\{)" -- '*.ts' '*.js' '*.py'
-git grep -nE "f[\"'].*(SELECT|INSERT|UPDATE|DELETE).*\{" -- '*.py'
-git grep -nE "format!.*(SELECT|INSERT|UPDATE|DELETE)" -- '*.rs'
+git grep -nP "(query|execute|raw)\s*\(\s*[\`'\"].*(\+|\$\{)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'
+git grep -nP "f[\"'].*(SELECT|INSERT|UPDATE|DELETE).*\{" -- '*.py'
+git grep -nP "format!.*(SELECT|INSERT|UPDATE|DELETE)" -- '*.rs'
 # Command / eval
-git grep -nE "(child_process|exec|execSync|spawn|os\.system|os\.popen|subprocess|Runtime\.exec)" -- '*.ts' '*.js' '*.py' '*.java'
-git grep -nE "\beval\s*\(|new Function\s*\(" -- '*.ts' '*.js' '*.py'
+git grep -nP "(child_process|exec|execSync|spawn|os\.system|os\.popen|subprocess|Runtime\.exec)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.java'
+git grep -nP "\beval\s*\(|new Function\s*\(" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'
 # XSS
-git grep -nE "dangerouslySetInnerHTML|v-html|innerHTML\s*=|insertAdjacentHTML" -- '*.tsx' '*.jsx' '*.vue' '*.ts' '*.js'
-git grep -nE "\|safe|\|raw|mark_safe|SafeString" -- '*.py' '*.html'
+git grep -nP "dangerouslySetInnerHTML|v-html|innerHTML\s*=|insertAdjacentHTML" -- '*.tsx' '*.jsx' '*.vue' '*.ts' '*.js'
+git grep -nP "\|safe|\|raw|mark_safe|SafeString" -- '*.py' '*.html'
 # NoSQL / object injection (Mongo, etc.)
-git grep -nE "\.(find|findOne|update|delete)(One|Many)?\s*\(\s*(req\.(body|query|params))" -- '*.ts' '*.js'
-git grep -nE "\$where|\$regex" -- '*.ts' '*.js'
+git grep -nP "\.(find|findOne|update|delete)(One|Many)?\s*\(\s*(req\.(body|query|params))" -- '*.ts' '*.tsx' '*.js' '*.jsx'
+git grep -nP "\$where|\$regex" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
 Classes: **SQL injection** (concat/interpolation, f-strings, `.raw()` — but NOT parameterized
@@ -155,8 +155,8 @@ Drive this from the entry-point table (Step 3). For **every** authenticated rout
 - **Mass assignment** — a create/update that spreads the whole request body into a model,
   allowing a client to set fields it shouldn't (`role`, `isAdmin`, `ownerId`):
   ```bash
-  git grep -nE "\.(create|update|save|insert)\s*\(\s*(\{?\s*\.\.\.)?req\.body" -- '*.ts' '*.js'
-  git grep -nE "(create|update)\([^)]*\*\*(request|req)\.(json|data|POST)" -- '*.py'
+  git grep -nP "\.(create|update|save|insert)\s*\(\s*(\{?\s*\.\.\.)?req\.body" -- '*.ts' '*.tsx' '*.js' '*.jsx'
+  git grep -nP "(create|update)\([^)]*\*\*(request|req)\.(json|data|POST)" -- '*.py'
   ```
   → `major` (`critical` if a privilege field is assignable).
 
@@ -170,7 +170,7 @@ For each entry point with `input validation? = no` in the table:
 
 **Path traversal** — user input used to build a filesystem path or key:
 ```bash
-git grep -nE "(readFile|writeFile|createReadStream|sendFile|path\.join|open|fs\.)" -- '*.ts' '*.js' '*.py' | git grep -nE "req\.(params|query|body)"
+git grep -nP "(readFile|writeFile|createReadStream|sendFile|path\.join|open|fs\.)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' | git grep -nP "req\.(params|query|body)"
 ```
 Flag `path.join(base, req.params.file)` / `open(user_path)` without a `path.resolve` +
 prefix/allowlist check or `..`/absolute-path rejection → `critical`. (`SEC-VAL-003`)
@@ -178,17 +178,17 @@ prefix/allowlist check or `..`/absolute-path rejection → `critical`. (`SEC-VAL
 ### Step 7: Authentication Mechanics
 
 ```bash
-git grep -nE "algorithms?\s*:\s*\[?\s*['\"]?none|verify\s*:\s*false|verify=False" -- '*.ts' '*.js' '*.py'   # JWT alg none / verify off
-git grep -nE "httpOnly\s*:\s*false|secure\s*:\s*false|sameSite\s*:\s*['\"]?none" -- '*.ts' '*.js'          # weak session cookie
-git grep -nE "createHash\(['\"](md5|sha1)|hashlib\.(md5|sha1)|MessageDigest\.getInstance\(['\"](MD5|SHA-1)" -- '*.ts' '*.js' '*.py' '*.java'  # weak password hash
-git grep -nE "bcrypt.*(genSalt|hash)\(\s*[0-9]\b" -- '*.ts' '*.js'   # bcrypt cost < 10
+git grep -nP "algorithms?\s*:\s*\[?\s*['\"]?none|verify\s*:\s*false|verify=False" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'   # JWT alg none / verify off
+git grep -nP "httpOnly\s*:\s*false|secure\s*:\s*false|sameSite\s*:\s*['\"]?none" -- '*.ts' '*.tsx' '*.js' '*.jsx'          # weak session cookie
+git grep -nP "createHash\(['\"](md5|sha1)|hashlib\.(md5|sha1)|MessageDigest\.getInstance\(['\"](MD5|SHA-1)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.java'  # weak password hash
+git grep -nP "bcrypt.*(genSalt|hash)\(\s*[0-9]\b" -- '*.ts' '*.tsx' '*.js' '*.jsx'   # bcrypt cost < 10
 ```
 Also flag: no rate limiting on `/login`, `/register`, `/reset` (no limiter middleware on auth
 routes) → `major`. **Timing-unsafe secret comparison** — a token/HMAC/signature compared with
 `===`/`==`/`.equals()` instead of `crypto.timingSafeEqual`/`hmac.compare_digest` → `major`
 (`SEC-AUTH-007`):
 ```bash
-git grep -nE "(token|secret|signature|hmac|digest|hash)\s*={2,3}\s*" -- '*.ts' '*.js'
+git grep -nP "(token|secret|signature|hmac|digest|hash)\s*={2,3}\s*" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 
 ### Step 8: CSRF
@@ -200,9 +200,9 @@ Token-in-header APIs (Authorization: Bearer) are generally exempt. → `major` /
 ### Step 9: SSRF & Open Redirect
 
 ```bash
-git grep -nE "(fetch|axios|got|request|urllib|http\.(get|request)|HttpClient|requests\.(get|post))\s*\(.*req\.(query|params|body)" -- '*.ts' '*.js' '*.py'
-git grep -nE "(redirect|Location)\s*\(?.*req\.(query|params|body)" -- '*.ts' '*.js'
-git grep -nE "redirect\(.*request\.(GET|POST|args)" -- '*.py'
+git grep -nP "(fetch|axios|got|request|urllib|http\.(get|request)|HttpClient|requests\.(get|post))\s*\(.*req\.(query|params|body)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'
+git grep -nP "(redirect|Location)\s*\(?.*req\.(query|params|body)" -- '*.ts' '*.tsx' '*.js' '*.jsx'
+git grep -nP "redirect\(.*request\.(GET|POST|args)" -- '*.py'
 ```
 SSRF: user-controlled URL fetched server-side without an allowlist → `major` (`critical` if it
 can reach cloud metadata `169.254.169.254` or internal services). Open redirect: redirect
@@ -211,9 +211,9 @@ target from user input without allowlist → `major`.
 ### Step 10: Cryptography
 
 ```bash
-git grep -nE "ECB|AES/ECB|mode=ECB|\bDES\b|DESede|3DES" -- '*.ts' '*.js' '*.py' '*.java' '*.go'
-git grep -nE "iv\s*[:=]\s*(['\"][0-9a-fA-F]{16,}|Buffer\.from\()" -- '*.ts' '*.js'   # hardcoded IV
-git grep -nE "Math\.random|random\.random\(\)|\brand\(\)" -- '*.ts' '*.js' '*.py'      # weak PRNG
+git grep -nP "ECB|AES/ECB|mode=ECB|\bDES\b|DESede|3DES" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.java' '*.go'
+git grep -nP "iv\s*[:=]\s*(['\"][0-9a-fA-F]{16,}|Buffer\.from\()" -- '*.ts' '*.tsx' '*.js' '*.jsx'   # hardcoded IV
+git grep -nP "Math\.random|random\.random\(\)|\brand\(\)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'      # weak PRNG
 ```
 ECB mode → `major`; DES/3DES → `major`; hardcoded IV → `major`; `Math.random()`/`random.random()`
 for a **security** value (token/id/nonce) → `major` (skip for jitter/shuffle — see
@@ -222,10 +222,10 @@ calibration). MD5/SHA1 for passwords/tokens → `critical`; for checksums/cache 
 ### Step 11: Unsafe Deserialization, ReDoS, Zip-Slip, Prototype Pollution
 
 ```bash
-git grep -nE "pickle\.loads?|yaml\.load\(|yaml\.unsafe_load|Marshal\.load|unserialize\(|ObjectInputStream" -- '*.py' '*.rb' '*.php' '*.java'
-git grep -nE "(new RegExp\(|re\.compile\().*(req\.|request\.|input)" -- '*.ts' '*.js' '*.py'   # user-supplied regex → ReDoS
-git grep -nE "(entry\.(path|name)|zipEntry|extractall|tarfile)" -- '*.ts' '*.js' '*.py'         # archive extraction → zip-slip
-git grep -nE "(merge|extend|defaultsDeep|set)\s*\(.*(req\.body|JSON\.parse)" -- '*.ts' '*.js'   # prototype pollution
+git grep -nP "pickle\.loads?|yaml\.load\(|yaml\.unsafe_load|Marshal\.load|unserialize\(|ObjectInputStream" -- '*.py' '*.rb' '*.php' '*.java'
+git grep -nP "(new RegExp\(|re\.compile\().*(req\.|request\.|input)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'   # user-supplied regex → ReDoS
+git grep -nP "(entry\.(path|name)|zipEntry|extractall|tarfile)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'         # archive extraction → zip-slip
+git grep -nP "(merge|extend|defaultsDeep|set)\s*\(.*(req\.body|JSON\.parse)" -- '*.ts' '*.tsx' '*.js' '*.jsx'   # prototype pollution
 ```
 - **Unsafe deserialization** — pickle/`yaml.load`/`Marshal.load`/PHP `unserialize`/Java
   `ObjectInputStream` on untrusted data → `major` (RCE class).
@@ -239,10 +239,10 @@ git grep -nE "(merge|extend|defaultsDeep|set)\s*\(.*(req\.body|JSON\.parse)" -- 
 ### Step 12: Insecure Defaults, CORS, Headers, Webhooks
 
 ```bash
-git grep -nE "cors\(\s*\{?\s*origin\s*:\s*['\"]?\*|Access-Control-Allow-Origin.*\*" -- '*.ts' '*.js' '*.py'
-git grep -nE "origin\s*:\s*(req\.headers\.origin|true)" -- '*.ts' '*.js'   # origin reflection
-git grep -nE "DEBUG\s*=\s*True|debug\s*:\s*true" -- '*.py' '*.ts' '*.js' '*.json'
-git grep -nE "(password|passwd|secret)\s*[:=]\s*['\"]?(admin|password|123456|default|changeme)" -- '*.ts' '*.js' '*.py' '*.yaml' '*.json'
+git grep -nP "cors\(\s*\{?\s*origin\s*:\s*['\"]?\*|Access-Control-Allow-Origin.*\*" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py'
+git grep -nP "origin\s*:\s*(req\.headers\.origin|true)" -- '*.ts' '*.tsx' '*.js' '*.jsx'   # origin reflection
+git grep -nP "DEBUG\s*=\s*True|debug\s*:\s*true" -- '*.py' '*.ts' '*.tsx' '*.js' '*.jsx' '*.json'
+git grep -nP "(password|passwd|secret)\s*[:=]\s*['\"]?(admin|password|123456|default|changeme)" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.yaml' '*.json'
 ```
 Flag: CORS `origin:'*'` with `credentials:true` → `critical`; CORS wildcard/origin-reflection
 otherwise → `major`; debug mode in prod config → `major`; default creds → `critical`;
@@ -255,10 +255,10 @@ that trusts the payload without verifying the provider signature** (Stripe/GitHu
 
 If terraform files are present:
 ```bash
-git grep -nE 'effect\s*=\s*"Allow".*actions\s*=\s*\["\*"\]|"Action":\s*"\*"' -- '*.tf'
-git grep -nE 'acl\s*=\s*"public-read|block_public_acls\s*=\s*false' -- '*.tf'
-git grep -nE 'encrypted\s*=\s*false|storage_encrypted\s*=\s*false' -- '*.tf'
-git grep -nE 'cidr_blocks\s*=\s*\["0\.0\.0\.0/0"\]' -- '*.tf'
+git grep -nP 'effect\s*=\s*"Allow".*actions\s*=\s*\["\*"\]|"Action":\s*"\*"' -- '*.tf'
+git grep -nP 'acl\s*=\s*"public-read|block_public_acls\s*=\s*false' -- '*.tf'
+git grep -nP 'encrypted\s*=\s*false|storage_encrypted\s*=\s*false' -- '*.tf'
+git grep -nP 'cidr_blocks\s*=\s*\["0\.0\.0\.0/0"\]' -- '*.tf'
 ```
 Combine with tflint findings. Wildcard IAM → `critical`; public bucket → `critical`; SG open to
 0.0.0.0/0 on a sensitive port → `critical`; unencrypted storage → `major`.
@@ -266,10 +266,10 @@ Combine with tflint findings. Wildcard IAM → `critical`; public bucket → `cr
 ### Step 14: Unsafe Install & Lifecycle Scripts
 
 ```bash
-git grep -nE "(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba)?sh\b" -- '*.md' '*.mdx' '*.rst'
-git grep -nE "\"(pre|post)?install\"\s*:\s*\"[^\"]*(curl|wget|node -e|sh |bash |sudo )" -- 'package.json'
-git grep -nE "\bsudo\b|chmod\s+\+x|chown\s+root" -- 'install.sh' 'setup.sh'
-git grep -nE "os\.system|subprocess[^)]*shell\s*=\s*True|sudo" -- 'setup.py' 'install.py'
+git grep -nP "(curl|wget)\s+[^|]*\|\s*(sudo\s+)?(ba)?sh\b" -- '*.md' '*.mdx' '*.rst'
+git grep -nP "\"(pre|post)?install\"\s*:\s*\"[^\"]*(curl|wget|node -e|sh |bash |sudo )" -- 'package.json'
+git grep -nP "\bsudo\b|chmod\s+\+x|chown\s+root" -- 'install.sh' 'setup.sh'
+git grep -nP "os\.system|subprocess[^)]*shell\s*=\s*True|sudo" -- 'setup.py' 'install.py'
 ```
 Pipe-to-shell installers → `major`; lifecycle hooks running arbitrary/remote commands →
 `major`; install scripts requiring elevated privileges → `minor` (escalate to `major` with a
@@ -283,8 +283,8 @@ generic web checks miss — without these, a Tauri/Flutter/Swift repo scores fal
 
 **Tauri (Rust + web):**
 ```bash
-git grep -nE "\"(shell|fs|http|all)\"\s*:\s*(true|\{)|\"scope\"|dangerousRemoteDomainIpcAccess|withGlobalTauri" -- 'tauri.conf.json' 'src-tauri/**/*.json'
-git grep -nE "#\[tauri::command\]|invoke_handler" -- 'src-tauri/**/*.rs'
+git grep -nP "\"(shell|fs|http|all)\"\s*:\s*(true|\{)|\"scope\"|dangerousRemoteDomainIpcAccess|withGlobalTauri" -- 'tauri.conf.json' 'src-tauri/**/*.json'
+git grep -nP "#\[tauri::command\]|invoke_handler" -- 'src-tauri/**/*.rs'
 ```
 Flag: overly broad `allowlist`/capability scopes (`shell: { all: true }`, `fs` scope `**`),
 `dangerousRemoteDomainIpcAccess`, missing updater `pubkey`, `#[tauri::command]`s that take a
@@ -292,8 +292,8 @@ path/command and act on it without validation → `major`.
 
 **Electron:**
 ```bash
-git grep -nE "nodeIntegration\s*:\s*true|contextIsolation\s*:\s*false|webSecurity\s*:\s*false|enableRemoteModule\s*:\s*true|allowRunningInsecureContent" -- '*.ts' '*.js'
-git grep -nE "shell\.openExternal\(|ipcMain\.(on|handle)\(" -- '*.ts' '*.js'
+git grep -nP "nodeIntegration\s*:\s*true|contextIsolation\s*:\s*false|webSecurity\s*:\s*false|enableRemoteModule\s*:\s*true|allowRunningInsecureContent" -- '*.ts' '*.tsx' '*.js' '*.jsx'
+git grep -nP "shell\.openExternal\(|ipcMain\.(on|handle)\(" -- '*.ts' '*.tsx' '*.js' '*.jsx'
 ```
 Flag: `nodeIntegration:true` / `contextIsolation:false` / `webSecurity:false` → `critical`;
 `shell.openExternal` on user input → `major`; unvalidated IPC channels acting on renderer
@@ -301,8 +301,8 @@ input → `major`; loading remote content into a privileged window → `major`.
 
 **Flutter / Dart:**
 ```bash
-git grep -nE "SharedPreferences|http://|NSAllowsArbitraryLoads|badCertificateCallback|allowBadCertificates" -- '*.dart'
-git grep -nE "(apiKey|secret|token|password)\s*=\s*['\"][^'\"]{12,}" -- '*.dart'
+git grep -nP "SharedPreferences|http://|NSAllowsArbitraryLoads|badCertificateCallback|allowBadCertificates" -- '*.dart'
+git grep -nP "(apiKey|secret|token|password)\s*=\s*['\"][^'\"]{12,}" -- '*.dart'
 ```
 Flag: secrets/tokens in source or `shared_preferences` (use `flutter_secure_storage`) →
 `major`/`critical`; cleartext `http://` to app APIs → `major`; disabled TLS validation
@@ -311,9 +311,9 @@ Flag: secrets/tokens in source or `shared_preferences` (use `flutter_secure_stor
 
 **iOS / Swift:**
 ```bash
-git grep -nE "NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads" -- '*.plist' 'Info.plist'
-git grep -nE "UserDefaults.*(token|password|secret|key)|kSecAttrAccessible" -- '*.swift'
-git grep -nE "(apiKey|secret|token)\s*=\s*\"[^\"]{12,}\"" -- '*.swift'
+git grep -nP "NSAllowsArbitraryLoads|NSExceptionAllowsInsecureHTTPLoads" -- '*.plist' 'Info.plist'
+git grep -nP "UserDefaults.*(token|password|secret|key)|kSecAttrAccessible" -- '*.swift'
+git grep -nP "(apiKey|secret|token)\s*=\s*\"[^\"]{12,}\"" -- '*.swift'
 ```
 Flag: ATS disabled (`NSAllowsArbitraryLoads = true`) → `major`; secrets/tokens in
 `UserDefaults` instead of Keychain → `major`; hardcoded secrets → `critical`; overly permissive
@@ -332,8 +332,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 1. **Privileged helper / XPC client validation** (`SEC-MACOS-001`):
    ```bash
-   git grep -nE "NSXPCListener|shouldAcceptNewConnection|setCodeSigningRequirement|setConnectionCodeSigningRequirement|SecCodeCopyGuestWithAttributes|kSecGuestAttribute(Pid|Audit)|SMAuthorizedClients|SMPrivilegedExecutables" -- '*.swift' '*.m' '*.plist'
-   git grep -nE "AuthorizationExecuteWithPrivileges|with administrator privileges" -- '*.swift' '*.m' '*.applescript'
+   git grep -nP "NSXPCListener|shouldAcceptNewConnection|setCodeSigningRequirement|setConnectionCodeSigningRequirement|SecCodeCopyGuestWithAttributes|kSecGuestAttribute(Pid|Audit)|SMAuthorizedClients|SMPrivilegedExecutables" -- '*.swift' '*.m' '*.plist'
+   git grep -nP "AuthorizationExecuteWithPrivileges|with administrator privileges" -- '*.swift' '*.m' '*.applescript'
    ```
    Read every `shouldAcceptNewConnection`. Flag: returns `true` with no code-signing check of the
    peer → `critical` when the listener runs as root, `major` otherwise. Peer checked by **PID**
@@ -353,8 +353,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 2. **Filesystem operations in a privileged context** (`SEC-MACOS-002`). Applies to code in the
    helper/daemon target or in any process running as root:
    ```bash
-   git grep -nE "removeItem|moveItem|copyItem|replaceItem|trashItem|createSymbolicLink|setAttributes|\b(l|f)?chown\(|\b(l|f)?chmod\(|\bunlink\(|\brename\(" -- '*Helper*/*.swift' '*Daemon*/*.swift'
-   git grep -nE "resolvingSymlinksInPath|standardizedFileURL|st_nlink|O_NOFOLLOW|openat|unlinkat|renameatx_np|fstatat|AT_SYMLINK_NOFOLLOW" -- '*.swift'
+   git grep -nP "removeItem|moveItem|copyItem|replaceItem|trashItem|createSymbolicLink|setAttributes|\b(l|f)?chown\(|\b(l|f)?chmod\(|\bunlink\(|\brename\(" -- '*Helper*/*.swift' '*Daemon*/*.swift'
+   git grep -nP "resolvingSymlinksInPath|standardizedFileURL|st_nlink|O_NOFOLLOW|openat|unlinkat|renameatx_np|fstatat|AT_SYMLINK_NOFOLLOW" -- '*.swift'
    ```
    Root acting **by path** on anything under a directory a less-privileged user can write
    (`/tmp`, `/private/var/tmp`, `/Library/Caches`, `/Users/*`, shared app-support dirs) can be
@@ -376,8 +376,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 3. **Localhost servers** (`SEC-MACOS-003`):
    ```bash
-   git grep -nE "NWListener|requiredLocalEndpoint|requiredInterfaceType|GCDWebServer|Swifter|HttpServer|FlyingFox|Telegraph|Vapor|\bbind\(|INADDR_ANY|0\.0\.0\.0" -- '*.swift' '*.m'
-   git grep -nE "\"[Hh]ost\"|\"[Oo]rigin\"|Access-Control-Allow-Origin" -- '*.swift'
+   git grep -nP "NWListener|requiredLocalEndpoint|requiredInterfaceType|GCDWebServer|Swifter|HttpServer|FlyingFox|Telegraph|Vapor|\bbind\(|INADDR_ANY|0\.0\.0\.0" -- '*.swift' '*.m'
+   git grep -nP "\"[Hh]ost\"|\"[Oo]rigin\"|Access-Control-Allow-Origin" -- '*.swift'
    ```
    A web page in any browser on the machine can reach `127.0.0.1`. Flag: a server meant to be
    local that binds all interfaces → `major`. `NWListener(using:on:)` with no
@@ -391,8 +391,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 4. **Custom URL schemes and Apple Events** (`SEC-MACOS-004`):
    ```bash
-   git grep -nE "CFBundleURLSchemes" -- '*.plist'
-   git grep -nE "kAEGetURL|onOpenURL|application\(_ [a-z]+: NSApplication, open urls|handleGetURLEvent|NSAppleScript\(source:" -- '*.swift'
+   git grep -nP "CFBundleURLSchemes" -- '*.plist'
+   git grep -nP "kAEGetURL|onOpenURL|application\(_ [a-z]+: NSApplication, open urls|handleGetURLEvent|NSAppleScript\(source:" -- '*.swift'
    ```
    Any web page can launch `scheme://…`. Flag: a handler that deletes, moves, executes, installs,
    changes settings or opens a path taken from the URL without a user confirmation step →
@@ -401,8 +401,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 5. **Updates and downloaded installs** (`SEC-MACOS-005`):
    ```bash
-   git grep -nE "SUFeedURL|SUPublicEDKey|SUPublicDSAKeyFile|SPUStandardUpdaterController|SUUpdater" -- '*.plist' '*.swift' '*.xcconfig'
-   git grep -nE "hdiutil|installer\s+-pkg|ditto|SecStaticCodeCheckValidity|SecRequirementCreateWithString|codesign\s+--verify|spctl" -- '*.swift' '*.sh'
+   git grep -nP "SUFeedURL|SUPublicEDKey|SUPublicDSAKeyFile|SPUStandardUpdaterController|SUUpdater" -- '*.plist' '*.swift' '*.xcconfig'
+   git grep -nP "hdiutil|installer\s+-pkg|ditto|SecStaticCodeCheckValidity|SecRequirementCreateWithString|codesign\s+--verify|spctl" -- '*.swift' '*.sh'
    ```
    Flag: Sparkle `SUFeedURL` over `http://` → `major` (`critical` if there is also no
    `SUPublicEDKey`); Sparkle 2 with no `SUPublicEDKey` → `major`. A custom updater or app
@@ -414,8 +414,8 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 6. **Hardened runtime and injection entitlements** (`SEC-MACOS-006`):
    ```bash
-   git grep -nE "disable-library-validation|allow-dyld-environment-variables|allow-unsigned-executable-memory|get-task-allow|com\.apple\.security\.app-sandbox" -- '*.entitlements' '*.plist'
-   git grep -nE "ENABLE_HARDENED_RUNTIME|--options[= ]runtime|codesign " -- '*.pbxproj' '*.xcconfig' '*.sh' 'Makefile' '*.yml'
+   git grep -nP "disable-library-validation|allow-dyld-environment-variables|allow-unsigned-executable-memory|get-task-allow|com\.apple\.security\.app-sandbox" -- '*.entitlements' '*.plist'
+   git grep -nP "ENABLE_HARDENED_RUNTIME|--options[= ]runtime|codesign " -- '*.pbxproj' '*.xcconfig' '*.sh' 'Makefile' '*.yml'
    ```
    Code injected into an app inherits its TCC grants (Full Disk Access, Accessibility, Automation)
    and satisfies any helper's code-signing requirement for that app. Flag in a release build:
@@ -427,7 +427,7 @@ not a security finding. See `shared/security-calibration.md` § macOS.
 
 7. **Subprocesses from a privileged process** (`SEC-MACOS-007`):
    ```bash
-   git grep -nE "Process\(\)|executableURL|launchPath|posix_spawn|\.environment\s*=|DYLD_" -- '*.swift'
+   git grep -nP "Process\(\)|executableURL|launchPath|posix_spawn|\.environment\s*=|DYLD_" -- '*.swift'
    ```
    Flag: a root process executing a binary at a path a user can write (Homebrew prefix,
    `~/`, `/usr/local/bin` when user-owned) or resolved through `PATH` → `critical`; a root process
@@ -609,7 +609,7 @@ const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
 
 ## Verification
 - Run: `npm test -- --grep "findUserByEmail"`
-- Run: `git grep -nE "query\(\s*\`" src/db/` and confirm zero interpolated queries
+- Run: `git grep -nP "query\(\s*\`" src/db/` and confirm zero interpolated queries
 ```
 
 ### Example 2: IDOR — Missing Ownership Check
@@ -657,7 +657,7 @@ res.json({ data: order.rows[0] });
 ## Verification
 - Run: `npm test -- --grep "orders"`
 - Manually: log in as user A, request an order id owned by user B → expect 404
-- Audit siblings: `git grep -nE "WHERE id = \\$1" src/api/` and confirm each has an owner scope
+- Audit siblings: `git grep -nP "WHERE id = \\$1" src/api/` and confirm each has an owner scope
 ```
 
 ### Example 3: CORS Wildcard with Credentials

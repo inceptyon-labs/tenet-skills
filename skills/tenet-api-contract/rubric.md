@@ -20,6 +20,7 @@ No critical-severity findings are defined for this dimension. API contract issue
 | AC-M04 | Unbounded list endpoint | A collection GET endpoint returns all records with no pagination, limit, or maximum cap | native |
 | AC-M05 | Misleading status codes | Handler returns 200 for errors, 500 for validation failures, or 404 for authorization failures | native |
 | AC-M06 | Mixed versioning strategies | Some routes use URL versioning (`/v1/`), others use header versioning, with no clear boundary | heuristic |
+| AC-M07 | Client/server contract drift breaks a call | A client in the same repo requires a field, type, enum case, path or command that the server handler does not provide on a reachable response, so the decode or the call fails at runtime | native |
 
 ### minor
 
@@ -33,6 +34,8 @@ No critical-severity findings are defined for this dimension. API contract issue
 | AC-m06 | DELETE not idempotent | A DELETE handler throws 500 or unhandled error when the resource is already deleted | native |
 | AC-m07 | Missing Content-Type header | JSON responses do not explicitly set `Content-Type: application/json` | heuristic |
 | AC-m08 | Inconsistent error status codes | Validation errors return 400 in some handlers and 422 in others with no pattern | native |
+| AC-m09 | Client/server contract drift, tolerated | Client and server in the same repo disagree on a response field (name, optionality or type) in a way the client currently tolerates | native |
+| AC-m10 | Inconsistent IPC command results | Tauri or Electron commands return success and error values in different shapes with no shared type | native |
 
 ### info
 

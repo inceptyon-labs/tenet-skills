@@ -73,8 +73,11 @@ reachable edge case = minor. Unverified candidates are not reported at any sever
 
 - **Severity:** major / minor
 - **Description:** A caller assumes a return shape the function does not guarantee (sorted vs
-  unsorted, empty array vs null, throws vs returns error), producing wrong downstream behavior.
-- **Detection:** Read the function's actual returns against each call site's assumptions.
+  unsorted, empty array vs null, throws vs returns error), or passes a value in the wrong unit
+  (cents vs dollars, seconds vs milliseconds, 0-based vs 1-based), producing wrong downstream
+  behavior.
+- **Detection:** Read the function's actual returns and parameter units against each call site's
+  assumptions.
 
 ---
 
@@ -95,6 +98,36 @@ reachable edge case = minor. Unverified candidates are not reported at any sever
   op (check balance→charge, check exists→create), so concurrent calls double-spend or double-write.
   Non-atomic read-modify-write on a counter.
 - **Detection:** Find guard-then-side-effect sequences on shared state; confirm no atomicity.
+
+### CORR-ATOMIC-001: Partial Failure Between Writes
+
+- **Severity:** critical (money/auth/mutation path) / major
+- **Description:** Two or more writes that must succeed or fail together run without a
+  transaction or compensation. When a later one fails, the earlier one stays, leaving state that
+  no code path repairs (charge captured but order not marked paid, row deleted but file kept).
+- **Detection:** For each multi-write sequence, fail the second write and read what is left.
+
+### CORR-IDEMP-001: Repeated Execution Duplicates a Side Effect
+
+- **Severity:** critical (money/auth/mutation path) / major
+- **Description:** A handler that can run more than once for one event (client retry,
+  double-submit, queue or webhook redelivery, job retried after a crash) repeats a side effect:
+  a second charge, a second email, a counter incremented twice.
+- **Detection:** Confirm the handler really can be re-entered for the same event, then look for an
+  idempotency key, dedupe check or conditional write. None present = finding.
+
+---
+
+## Invariants
+
+### CORR-INVARIANT-001: Cross-Function Invariant Violation
+
+- **Severity:** critical (money/entitlement/auth state) / major
+- **Description:** A rule a value must always obey (a refund never exceeds the captured amount,
+  stock never goes negative, status only moves forward, an order is fulfilled at most once) is
+  broken by one of its write sites, even though each function reads correctly in isolation.
+- **Detection:** Step 3b. Write the invariants, enumerate every write site repo-wide, test each
+  site against each invariant with a request the system can really receive.
 
 ---
 
@@ -123,4 +156,6 @@ reachable edge case = minor. Unverified candidates are not reported at any sever
 | `.healthcheck/reports/correctness.json` | Valid JSON, matches schema, every finding has `fix_prompt` |
 | Each finding | Has a concrete failing-input scenario in the description, `snippet`, `confidence` |
 | `notes` | States which paths/files were reviewed AND which were not |
+| `.healthcheck/state/correctness-coverage.json` | Valid JSON; lists only files read in full this run or carried from earlier runs |
+| Carried-forward findings | Each re-read against current code; none dropped unread, none kept unverified |
 | Score | Computed from severity counts via the standard formula |

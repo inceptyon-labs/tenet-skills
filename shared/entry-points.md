@@ -56,8 +56,8 @@ that apply (a repo may mix, e.g. Next.js API routes + tRPC).
 ### Express / Fastify / Koa (Node)
 
 ```bash
-git grep -nE "\b(app|router|r|api)\.(get|post|put|patch|delete|all)\s*\(" -- '*.ts' '*.js'
-git grep -nE "\.(use)\s*\(" -- '*.ts' '*.js'   # middleware — note auth middleware & order
+git grep -nP "\b(app|router|r|api)\.(get|post|put|patch|delete|all)\s*\(" -- '*.ts' '*.tsx' '*.tsx' '*.js' '*.jsx'
+git grep -nP "\.(use)\s*\(" -- '*.ts' '*.tsx' '*.tsx' '*.js' '*.jsx'   # middleware — note auth middleware & order
 ```
 Middleware **order** matters: an auth middleware registered *after* a route, or on the wrong
 router, does not protect it. Confirm the auth middleware actually wraps each route.
@@ -65,9 +65,9 @@ router, does not protect it. Confirm the auth middleware actually wraps each rou
 ### Hono (Cloudflare Workers — Jason's default web backend)
 
 ```bash
-git grep -nE "\.(get|post|put|patch|delete|on|all)\s*\(" -- '*.ts'
-git grep -nE "\.(use|route)\s*\(" -- '*.ts'          # middleware mounts & sub-apps
-git grep -nE "\bc\.(req|env|var)\b" -- '*.ts'         # request access inside handlers
+git grep -nP "\.(get|post|put|patch|delete|on|all)\s*\(" -- '*.ts' '*.tsx'
+git grep -nP "\.(use|route)\s*\(" -- '*.ts' '*.tsx'          # middleware mounts & sub-apps
+git grep -nP "\bc\.(req|env|var)\b" -- '*.ts' '*.tsx'         # request access inside handlers
 ```
 Check that `app.use('*', authMiddleware)` or per-route middleware runs before protected
 handlers, and that `c.req.param()/query()/json()` values are validated (often via
@@ -77,8 +77,8 @@ hardcoded.
 ### tRPC
 
 ```bash
-git grep -nE "(publicProcedure|protectedProcedure|\.procedure)\b" -- '*.ts'
-git grep -nE "\.(query|mutation)\s*\(" -- '*.ts'
+git grep -nP "(publicProcedure|protectedProcedure|\.procedure)\b" -- '*.ts' '*.tsx'
+git grep -nP "\.(query|mutation)\s*\(" -- '*.ts' '*.tsx'
 ```
 **A `publicProcedure` that is a `.mutation` is a finding** unless it is genuinely public
 (login, signup, public webhook). Confirm `protectedProcedure` actually enforces auth in its
@@ -87,9 +87,9 @@ middleware, and that mutations scope by `ctx.session.user.id`.
 ### Next.js (App Router + Pages)
 
 ```bash
-git grep -nE "export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)" -- 'app/**/route.ts' 'app/**/route.js'
-git grep -rln "" -- 'pages/api'                       # every file under pages/api is an endpoint
-git grep -nE "'use server'|\"use server\"" -- '*.ts' '*.tsx'   # server actions are entry points too
+git grep -nP "export\s+(async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)" -- '*app/*route.ts' '*app/*route.js'
+git ls-files -- '*pages/api/*'                             # every file under pages/api is an endpoint
+git grep -nP "'use server'|\"use server\"" -- '*.ts' '*.tsx'   # server actions are entry points too
 ```
 Server Actions (`'use server'`) are unauthenticated by default and are real mutation entry
 points — audit them like routes.
@@ -97,9 +97,9 @@ points — audit them like routes.
 ### SvelteKit
 
 ```bash
-git grep -rln "" -- 'src/**/+server.ts' 'src/**/+server.js'    # API endpoints
-git grep -nE "export\s+(const|function)\s+(GET|POST|PUT|PATCH|DELETE)" -- 'src/**/+server.*'
-git grep -nE "export\s+(const|function)\s+(load|actions)\b" -- 'src/**/+page.server.*' 'src/**/+layout.server.*'
+git ls-files -- '*+server.ts' '*+server.js'            # API endpoints
+git grep -nP "export\s+(const|function)\s+(GET|POST|PUT|PATCH|DELETE)" -- '*+server.ts' '*+server.js'
+git grep -nP "export\s+(const|function)\s+(load|actions)\b" -- '*+page.server.*' '*+layout.server.*'
 ```
 `+page.server.ts` `load` functions **return data to the browser** — a `load` that returns a
 full user/tenant record without field filtering is a data-exposure finding. Form `actions`
@@ -108,9 +108,9 @@ are mutation entry points; verify auth via `locals` and ownership scoping.
 ### FastAPI / Flask / Django (Python)
 
 ```bash
-git grep -nE "@(app|router|api|blueprint)\.(get|post|put|patch|delete|route)\b" -- '*.py'
-git grep -nE "@(login_required|permission_required|requires)\b" -- '*.py'   # auth decorators
-git grep -nE "(path|re_path|url)\s*\(" -- 'urls.py' '**/urls.py'            # Django routing
+git grep -nP "@(app|router|api|blueprint)\.(get|post|put|patch|delete|route)\b" -- '*.py'
+git grep -nP "@(login_required|permission_required|requires)\b" -- '*.py'   # auth decorators
+git grep -nP "(path|re_path|url)\s*\(" -- '*urls.py'            # Django routing
 ```
 For FastAPI, check for `Depends(get_current_user)` on protected routes and Pydantic models on
 the body. For Django, check `LoginRequiredMixin`/`permission_required` and queryset scoping
@@ -119,8 +119,8 @@ the body. For Django, check `LoginRequiredMixin`/`permission_required` and query
 ### Go (net/http, chi, gin, echo)
 
 ```bash
-git grep -nE "\.(HandleFunc|Handle|GET|POST|PUT|PATCH|DELETE)\s*\(" -- '*.go'
-git grep -nE "\.(Use)\s*\(" -- '*.go'   # middleware
+git grep -nP "\.(HandleFunc|Handle|GET|POST|PUT|PATCH|DELETE)\s*\(" -- '*.go'
+git grep -nP "\.(Use)\s*\(" -- '*.go'   # middleware
 ```
 
 ### Serverless / other

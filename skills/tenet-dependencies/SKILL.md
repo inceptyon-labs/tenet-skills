@@ -197,9 +197,8 @@ DEPS=$(jq -r '.dependencies // {} | keys[]' package.json 2>/dev/null)
 # For each dependency, check if it's imported anywhere in source
 for dep in $DEPS; do
   # Search for import/require of this package
-  grep -rq "from ['\"]${dep}['\"/]\|require(['\"]${dep}['\"/]" \
-    --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
-    --include="*.mjs" --include="*.cjs" src/ lib/ app/ pages/ 2>/dev/null
+  git grep -qP "from ['\"]${dep}['\"/]|require\(['\"]${dep}['\"/]" -- \
+    '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.cjs'
 done
 ```
 
@@ -217,7 +216,7 @@ done
 ```bash
 # Parse requirements.txt or pyproject.toml for declared packages
 # Search for imports matching package names (handle name mapping: e.g., Pillow -> PIL)
-grep -rn "^import \|^from " --include="*.py" src/ app/ 2>/dev/null
+git grep -nP "^import |^from " -- '*.py'
 ```
 
 **Severity:** `minor` for unused production dependencies. `info` for unused dev dependencies.
@@ -293,7 +292,7 @@ Write `.healthcheck/reports/dependencies.json`:
   "key": "dependencies",
   "score": 68,
   "weight": 1.3,
-  "skill_version": "1.0.0",
+  "skill_version": "1.0.1",
   "notes": "Scanned package.json with 42 dependencies and requirements.txt with 18 packages. Found 2 known CVEs (1 critical, 1 major), 3 unmaintained packages, 1 duplicate dependency group, and 4 severely outdated packages. Critical: postcss ReDoS vulnerability (CVE-2023-44270) requires immediate update.",
   "applicable": true,
   "metrics": {

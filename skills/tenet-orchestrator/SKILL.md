@@ -212,7 +212,7 @@ Read all dimension reports and aggregate into the final payload matching the sch
   "run": {
     "started_at": "<ISO-8601>",
     "completed_at": "<ISO-8601>",
-    "orchestrator_version": "1.0.0",
+    "orchestrator_version": "1.1.1",
     "dimensions_run": ["security", "complexity", ...],
     "toolchain_summary": { ... },
     "lines_of_code": 18420,

@@ -88,6 +88,37 @@ Start at **100**, subtract: `5 x critical + 2 x major + 0.5 x minor`. Floor 0, c
 - Props in components rendered once (e.g., top-level `<App>`)
 - Style objects extracted to module-level constants (these are stable references)
 
+### Swift and SwiftUI (Apple Platforms Only)
+
+| Pattern | Severity | Confidence | Notes |
+|---|---|---|---|
+| Blocking network call (`Data(contentsOf:)` with a remote URL, semaphore wait) on the main actor | major | heuristic | Freezes the UI for the length of the request |
+| Synchronous read of an unbounded file on the main actor | minor | heuristic | Small bundled files at launch are not findings |
+| Formatter, decoder or regex created inside `body`, a row view or a loop | minor | heuristic | Rebuilt on every render; hoist to a `static let` |
+| Sort, filter or grouping of a non-trivial collection inside `body` | minor | heuristic | Reruns on every state change |
+| Fetch per row, or unbounded `@Query` filtered in memory, over a table that grows with use | major | heuristic | N+1 against the local store |
+| Repeating `Timer`, observer or `CADisplayLink` never invalidated or removed | minor | heuristic | |
+| Closure stored on `self` that captures `self` strongly, on an object created repeatedly | major | heuristic | Retain cycle; the object and its work never stop |
+
+### Flutter and Dart (Flutter Only)
+
+| Pattern | Severity | Confidence | Notes |
+|---|---|---|---|
+| Network `Future` or `Stream` created inline in `build()` | major | heuristic | Request restarts on every rebuild |
+| Other `Future` created inline in `build()` | minor | heuristic | |
+| `ListView(children: …map…)` or a `Column` in a scroll view over data that grows with use | minor | heuristic | Builds every child; use `ListView.builder` |
+| Stream subscription or `Timer.periodic` never cancelled, on a screen opened repeatedly | major | heuristic | |
+| Controller or `FocusNode` with no `dispose()` | minor | heuristic | Check the same `State` class first |
+| Synchronous file I/O or large `jsonDecode` on the UI isolate over unbounded data | minor | heuristic | |
+
+### Tauri Commands (Tauri Only)
+
+| Pattern | Severity | Confidence | Notes |
+|---|---|---|---|
+| Synchronous `#[tauri::command]` doing network, subprocess or directory-walk work | major | heuristic | Plain `fn` commands run on the main thread |
+| Synchronous `#[tauri::command]` doing a bounded local read | minor | heuristic | |
+| Blocking call inside an `async fn` command without `spawn_blocking` | minor | heuristic | Stalls the runtime other commands share |
+
 ## Dimension Metrics
 
 The report MUST include these metrics in the `metrics` object:

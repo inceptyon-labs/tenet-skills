@@ -47,9 +47,27 @@ Prefer deterministic/static tool output when present:
 
 Applicable when the repo contains Terraform, Pulumi, CloudFormation, Kubernetes manifests, Helm charts, Docker Compose, ECS/task definitions, or cloud deployment YAML.
 
+```bash
+git ls-files -- '*.tf' '*.tfvars' '*Pulumi.*' '*cloudformation*' '*template.y*ml' '*k8s/*' '*kubernetes/*' '*helm/*' '*Chart.yaml' '*docker-compose*' '*compose.y*ml' '*Dockerfile*' '*task-definition*' '*serverless.y*ml' '*fly.toml' '*render.yaml' | head -80
+```
+
 If none exist, write `score: null`, `applicable: false`.
 
+**Where it runs.** Before judging exposure, establish from the README, deploy docs and config
+whether the target is a public cloud, or a private network such as a home server or LAN-only
+host with no tunnel or port forward. Record it in `notes`. An open port means different things in
+each.
+
+**Project scale.** Classify the project per `shared/project-scale.md` before scoring anything. Findings
+marked *(scaled)* below are `info` at `solo` scale and keep the listed severity at `team` scale.
+
+
 ### Step 1: Public Exposure
+
+```bash
+git grep -nP "0\.0\.0\.0/0|::/0|publicly_accessible\s*=\s*true|acl\s*=\s*\"public-read|block_public_(acls|policy)\s*=\s*false|type:\s*LoadBalancer|hostNetwork:\s*true" -- '*.tf' '*.tfvars' '*.yaml' '*.yml' '*.json'
+git grep -nP "^\s*-\s*['\"]?(\d{1,3}(\.\d{1,3}){3}:)?\d+:(5432|3306|27017|6379|9200|5984|11211|2375|9000)\b" -- '*docker-compose*' '*compose.y*ml'
+```
 
 Check for:
 - `0.0.0.0/0`, `::/0`, public load balancers, public S3/storage buckets
@@ -57,7 +75,7 @@ Check for:
 - Docker Compose `ports` exposing databases/cache publicly
 
 Severity:
-- `critical`: databases, admin panels, object storage, or internal services exposed publicly
+- `critical`: databases, admin panels, object storage, or internal services exposed publicly. On a private-network target (see Step 0), a database or cache port published by Compose is reachable by every device on that network, not the internet: `minor`, and not a finding at all when the mapping binds to `127.0.0.1`
 - `major`: broad public ingress on app services without TLS/auth evidence
 - `minor`: overly broad egress or management ports in dev-only configs
 
@@ -93,8 +111,8 @@ Severity follows blast radius: `critical` for privileged host access, `major` fo
 If deployment docs mention manual console setup with no IaC equivalent, flag drift risk.
 
 Severity:
-- `major`: critical resources documented only as manual setup
-- `minor`: non-critical manual setup not codified
+- `major`: critical resources documented only as manual setup *(scaled)*
+- `minor`: non-critical manual setup not codified *(scaled)*
 
 ### Step 6: Compile and Score
 

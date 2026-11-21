@@ -354,24 +354,20 @@ Scan for committed skip/focus markers that indicate test health problems:
 
 ```bash
 # Skip markers (tests that have been disabled)
-git ls-files | xargs grep -n -E \
-  '\b(test\.skip|it\.skip|describe\.skip|xit\b|xdescribe\b|xcontext\b|@skip|@pytest\.mark\.skip|@unittest\.skip|t\.Skip\()' \
-  2>/dev/null
+git grep -nP \
+  '\b(test\.skip|it\.skip|describe\.skip|xit\b|xdescribe\b|xcontext\b|@skip|@pytest\.mark\.skip|@unittest\.skip|t\.Skip\()'
 
 # Focus markers (accidentally committed .only — breaks CI for other tests)
-git ls-files | xargs grep -n -E \
-  '\b(test\.only|it\.only|describe\.only|fdescribe\b|fit\b|fcontext\b|@pytest\.mark\.only|\.only\()' \
-  2>/dev/null
+git grep -nP \
+  '\b(test\.only|it\.only|describe\.only|fdescribe\(|fit\(|fcontext\(|@pytest\.mark\.only|\.only\()'
 
 # Flaky markers (explicitly marked as flaky)
-git ls-files | xargs grep -n -i -E \
-  '(flaky|intermittent|unreliable|retry|@retry|@flaky|\.retries\()' \
-  2>/dev/null
+git grep -niP \
+  '(flaky|intermittent|unreliable|retry|@retry|@flaky|\.retries\()'
 
 # Timeout overrides (may indicate slow or flaky tests)
-git ls-files | xargs grep -n -E \
-  '(jest\.setTimeout\(|timeout:\s*[0-9]{5,}|this\.timeout\([0-9]{5,}\))' \
-  2>/dev/null
+git grep -nP \
+  '(jest\.setTimeout\(|timeout:\s*[0-9]{5,}|this\.timeout\([0-9]{5,}\))'
 ```
 
 | Condition | Severity |
@@ -429,7 +425,7 @@ Additional quality signals from test file content:
 
 ```bash
 # Tests with no assertions (empty test bodies)
-git ls-files | xargs grep -l -E '\.(test|spec)\.(ts|tsx|js|jsx)$' | while read f; do
+git ls-files -- '*.test.ts' '*.test.tsx' '*.test.js' '*.test.jsx' '*.spec.ts' '*.spec.tsx' '*.spec.js' '*.spec.jsx' | while read f; do
   # Look for test blocks with no expect/assert
   grep -c 'expect\|assert\|should\|toBe\|toEqual\|toMatch' "$f"
 done
@@ -471,7 +467,7 @@ Write the dimension report to `.healthcheck/reports/testing.json`:
   "key": "testing",
   "score": 65,
   "weight": 1.1,
-  "skill_version": "1.0.0",
+  "skill_version": "1.0.1",
   "applicable": true,
   "notes": "Line coverage at 52% with 0.3 test-to-source ratio. Authentication module has no tests. Found 3 committed .skip markers (oldest 6 months). No integration tests detected.",
   "metrics": {

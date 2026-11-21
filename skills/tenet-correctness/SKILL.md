@@ -23,8 +23,14 @@ guard.
 
 Correctness bugs cannot be found by grep, and they cannot be found by skimming. This skill works
 by **selecting a bounded set of high-risk code and reading it deliberately**, tracing concrete
-inputs. It does not attempt to read the whole repo — it spends its attention where a bug hurts
-most.
+inputs. A single run does not attempt to read the whole repo — it spends its attention where a
+bug hurts most. Coverage accumulates across runs: each run records what it reviewed, and the next
+one spends its budget on code that is new, changed, or not yet read (Step 2).
+
+Two passes reach past the review set, because some bugs cannot be seen one function at a time: the
+invariant pass (Step 3b) checks every write to a money value or status field against the rules it
+must obey, and the variant sweep (Step 5b) takes each confirmed bug and looks for the same mistake
+everywhere else.
 
 ## What counts as a bug here — read first
 
@@ -57,7 +63,8 @@ have something to report). These protocols guard both:
   set, systemic grouping, and §2a "report only issues that actually exist".
 - **`shared/entry-points.md`** — the entry-point inventory feeds path selection (Step 2).
 - **`shared/verification.md`** — every bug must be traced to a concrete failing input and
-  survive a refutation pass before it ships (Step 5).
+  survive a refutation pass before it ships (Step 5). Candidates from the invariant pass
+  (Step 3b), the variant sweep (Step 5b) and the previous run's report get no shortcut.
 
 ## Language Support Matrix
 
@@ -92,24 +99,65 @@ If the repo has no application source code (docs/config/assets only), set `appli
 You have limited attention. Spend it where bugs are most likely and most costly. Build the
 review set from the union of:
 
-1. **Critical paths** — anything touching auth, sessions, payments/billing, money/quantity math,
-   data mutation (writes/deletes/migrations), access control, and permission checks. Find them:
+1. **Critical paths** — anything touching auth, sessions, payments/billing, purchases and
+   entitlements, money/quantity math, data mutation (writes/deletes/migrations), sync and merge,
+   access control, and permission checks. Find them:
    ```bash
-   git grep -lnE "password|login|session|token|auth|permission|role|charge|payment|invoice|price|refund|balance|checkout|order|transfer" -- '*.ts' '*.js' '*.py' '*.go' '*.rs' '*.java' '*.swift' '*.dart'
+   git grep -ciE "password|login|session|token|auth|permission|role|charge|payment|invoice|price|refund|balance|checkout|order|transfer|purchase|entitlement|subscription|receipt|credit|quota|migrat" \
+     -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.svelte' '*.vue' '*.py' '*.go' '*.rs' '*.java' '*.kt' '*.swift' '*.dart' '*.rb' '*.php' '*.cs' \
+     ':!*.test.*' ':!*.spec.*' ':!*_test.*' ':!**/__tests__/**' ':!**/test/**' ':!**/tests/**' \
+     | sort -t: -k2 -rn | head -40
    ```
-2. **Churn hotspots** — the files changed most often are where bugs cluster:
+   Output is `file:hits`, densest first. These are substring matches (`order` also hits
+   `border`), so a file with one or two hits is usually noise; the top of the list is the signal.
+   The keyword list is a starting point, not the definition: add the repo's own domain words
+   (the nouns in its README and schema, plus `sync`/`merge` logic where the app has it) before
+   trusting the result.
+2. **Churn hotspots** — the source files changed most often are where bugs cluster:
    ```bash
    git log --since="6 months ago" --name-only --pretty=format: 2>/dev/null \
-     | grep -vE '^$' | sort | uniq -c | sort -rn | head -30
+     | grep -E '\.(ts|tsx|js|jsx|mjs|svelte|vue|py|go|rs|java|kt|swift|dart|rb|php|cs)$' \
+     | grep -vE '(\.test\.|\.spec\.|_test\.|/__tests__/|/tests?/)' \
+     | sort | uniq -c | sort -rn | head -30
    ```
 3. **Entry-point handlers** — from `shared/entry-points.md`, the functions that process external
    input.
 4. **Complex functions** — if `.healthcheck/reports/complexity.json` exists, its high-complexity
    functions (branchy code hides logic bugs).
 
+**Use what earlier runs already covered.** Two files from the previous run may be on disk; read
+them before they are overwritten:
+
+- `.healthcheck/reports/correctness.json` — its unsuppressed `findings` are carried forward as
+  candidates. Each one is re-verified in Step 5 against the current code. A finding nobody fixed
+  must not vanish from the report because this run looked elsewhere.
+- `.healthcheck/state/correctness-coverage.json` — maps each file to the commit it was last
+  reviewed at. A file is **covered** when it has not changed since that commit:
+  ```bash
+  mkdir -p .healthcheck/tmp
+  jq -r '.files | to_entries[] | "\(.value) \(.key)"' .healthcheck/state/correctness-coverage.json 2>/dev/null \
+    | while read -r sha f; do
+        if [ -f "$f" ] && git diff --quiet "$sha" -- "$f" 2>/dev/null; then echo "$f"; fi
+      done > .healthcheck/tmp/correctness-covered.txt
+  ```
+  No coverage file, or a commit git no longer knows, means not covered.
+
+**Fill the budget in this order**, cutting from the bottom when it runs out:
+
+1. Critical-path units that are not covered (never reviewed, or changed since).
+2. Entry-point handlers that are not covered.
+3. Churn hotspots and high-complexity functions that are not covered.
+4. Any other source file that is not covered, largest first. This tier is what walks the rest of
+   the repo over successive runs.
+5. Covered critical-path units, oldest review first, only if budget remains.
+
+For a unit that changed since its last review, also read its callers: a change that is correct in
+isolation can break an assumption a caller still holds (Step 4).
+
 Cap the set to a reviewable size (roughly 25–40 functions/files for a normal run; scale with
 repo size). **Record in `notes` exactly which files/paths were reviewed and which were not** —
-this dimension explicitly does not claim whole-repo coverage, so state the scope honestly.
+a single run does not claim whole-repo coverage, so state the scope honestly. When tiers 1–4 are
+empty, every source file has been reviewed at its current content: say so in `notes`.
 
 ### Step 3: Read Each Selected Unit Deliberately
 
@@ -159,8 +207,37 @@ swallowing produce a *wrong answer* silently?).
 iterating it, a cache never invalidated, a memoization key that misses an input, stale closure
 capturing an old value.
 
-**k. Time, timezone, locale, money.** Naive date math across DST, mixing local and UTC, floating
-money, off-by-one in date ranges, locale-dependent parsing.
+**k. Time, timezone, locale, money, units.** Naive date math across DST, mixing local and UTC,
+floating money, off-by-one in date ranges, locale-dependent parsing. A value crossing a boundary
+in the wrong unit: cents passed where dollars are expected, seconds where milliseconds are, a
+0-based index where the callee counts from 1.
+
+**l. Partial failure and repeats.** Two writes that must move together with no transaction
+between them: if the second fails, what state is left, and does anything repair it? A handler
+that can run twice for one event (client retry, double-submit, queue or webhook redelivery, a job
+retried after a crash halfway): does the second run repeat a side effect (a second charge, a
+second email, a counter incremented twice)?
+
+### Step 3b: Invariant Pass (money and state)
+
+The lenses above look at one function at a time. Some bugs exist only across functions: each one
+reads fine, and together they let a refund exceed its charge. For the values whose corruption
+costs the most in this repo (balances, credits, stock or quantity, the status of an order,
+subscription or entitlement; pick at most five):
+
+1. **Write the invariants** in the worklog, one line each, taken from what the code, schema and
+   tests show is intended: "a refund never exceeds the captured amount", "stock never goes
+   negative", "an order is fulfilled at most once", "status only moves forward".
+2. **Enumerate every site that writes the value, repo-wide**, not only inside the review set
+   (`git grep` the column, field, setter or model method). This is an enumeration step under
+   `shared/scan-discipline.md` §2: build the full list, then check each entry off.
+3. **Test each write site against each invariant.** Can a request this system really receive break
+   it: a second call, two concurrent calls, a zero, negative or oversized amount, a call out of
+   order (refund before capture, cancel after fulfil), a failure between two writes?
+
+A write site that breaks an invariant is a candidate like any other. It needs its
+"input X → line N does Y → wrong because Z" sentence and goes through Steps 4 and 5. If the repo
+has no money values or stateful entities, record "no stateful values" in the worklog and move on.
 
 ### Step 4: Cross-Reference Callers
 
@@ -178,8 +255,33 @@ Per `shared/verification.md`, for every candidate:
   a framework guarantee that prevents the bad input from reaching this line? Is the path dead?
   Does a test assert this behavior on purpose? Any yes → drop.
 - Quote the offending line(s) into `snippet`.
+- For a `critical`, write the trace hop by hop in the worklog: each step from the entry point to
+  the wrong outcome as `file:line`. A hop you cannot cite means the candidate is not confirmed.
+  Then re-read the function from its first line as if the worklog entry did not exist and try to
+  make it produce the right answer for input X. If it does, drop the candidate.
+- Findings carried forward from the previous report (Step 2) are candidates, not findings.
+  Re-read the line: still wrong keeps it, fixed or gone drops it.
 
 Only bugs with a stated failing scenario that survive refutation ship, at any severity.
+
+### Step 5b: Variant Sweep
+
+A confirmed bug usually has siblings outside the review set: the same copy-pasted block, the same
+helper misused by another caller. For each distinct root cause among the confirmed findings:
+
+1. **State the root cause as the rule the code broke**, in one line: "callers treat `findUser()`
+   as non-null, but it returns null for soft-deleted users".
+2. **Search for it repo-wide.** Start with a `git grep` pattern that matches the known instance.
+   If it does not hit the known line, the pattern is wrong; fix it before going further. Then
+   widen one element at a time (other callers of the helper, the same idiom with other variable
+   names). Size each result before reading it (`shared/scan-discipline.md` §1).
+3. **Verify every hit on its own** through Steps 4 and 5. A hit is a candidate. Similar code
+   elsewhere often has the guard the original lacked.
+4. **Fold confirmed variants into the original finding**, listing every `file:line`
+   (`shared/scan-discipline.md` §4). Five or more files triggers the systemic escalation in
+   `shared/severity.md`.
+
+One sweep per root cause. A confirmed variant does not start another sweep.
 
 ### Step 6: Score & Write Report
 
@@ -207,14 +309,22 @@ Apply suppressions (`shared/suppressions.md`). Write `.healthcheck/reports/corre
   "key": "correctness",
   "score": 78,
   "weight": 1.3,
-  "skill_version": "1.0.0",
+  "skill_version": "1.1.0",
   "applicable": true,
-  "notes": "Reviewed 31 functions across auth (8), billing (6), order mutation (9), and top churn files (8). Did NOT review the admin UI or reporting modules. Found 1 critical double-charge race in checkout, 1 major off-by-one in pagination, and 4 minor null-path bugs.",
+  "notes": "Reviewed 31 functions across auth (8), billing (6), order mutation (9), and top churn files (8). Did NOT review the admin UI or reporting modules. Found 1 critical double-charge race in checkout, 1 major off-by-one in pagination, and 4 minor null-path bugs. Checked 3 invariants on order status and balance across 14 write sites. 1 variant sweep found 2 more sites of the pagination bug. 2 findings carried forward from the previous run, 1 now fixed.",
   "metrics": {
     "units_reviewed": 31,
     "critical_paths_covered": ["auth", "billing", "orders"],
     "not_reviewed": ["admin-ui", "reporting"],
     "churn_hotspots_reviewed": 8,
+    "invariants_checked": 3,
+    "write_sites_checked": 14,
+    "variant_sweeps": 1,
+    "variants_confirmed": 2,
+    "carried_forward": 2,
+    "carried_forward_fixed": 1,
+    "source_files_covered": 58,
+    "source_files_total": 212,
     "suppressed_count": 0,
     "confidence_breakdown": { "native": 5, "heuristic": 1 }
   },
@@ -222,13 +332,27 @@ Apply suppressions (`shared/suppressions.md`). Write `.healthcheck/reports/corre
     { "name": "Critical-path trace (auth)", "status": "passed", "description": "Traced login/session flows; no logic error found" },
     { "name": "Critical-path trace (billing)", "status": "failed", "count": 1, "description": "Double-charge race in checkout" },
     { "name": "Boundary/off-by-one review", "status": "failed", "count": 1 },
-    { "name": "Null/undefined path review", "status": "failed", "count": 4 }
+    { "name": "Null/undefined path review", "status": "failed", "count": 4 },
+    { "name": "Invariant pass (order status, balance)", "status": "passed", "count": 0, "description": "14 write sites checked against 3 invariants" },
+    { "name": "Variant sweep", "status": "failed", "count": 2, "description": "Pagination off-by-one repeated in 2 other list endpoints" }
   ],
   "findings": [ ... ]
 }
 ```
 
-Delete `.healthcheck/tmp/correctness-*.md` scratch files when done.
+Then update `.healthcheck/state/correctness-coverage.json` so the next run can rotate. Set every
+file reviewed in this run to the current commit and keep the entries for files this run did not
+touch:
+
+```json
+{ "files": { "src/orders/checkout.ts": "a1b2c3d", "src/auth/session.ts": "9f8e7d6" } }
+```
+
+Only list a file here if every function in it was read in Step 3. A file opened to check one
+caller is not covered. If the working tree has uncommitted changes to a reviewed file, leave it
+out so the next run reads it again.
+
+Delete `.healthcheck/tmp/correctness-*` scratch files when done.
 
 ## Confidence Tiers
 
@@ -249,7 +373,12 @@ Confidence describes how the bug was found. It never means "not sure it is a bug
   can never run has no correctness bugs (dead code belongs to `tenet-debt`).
 - NEVER pad the report. Zero findings is a valid result; state what was reviewed in `notes` and
   mark the checks `passed`.
-- NEVER claim whole-repo coverage. Always list what was reviewed and what was not in `notes`.
+- NEVER claim whole-repo coverage for a single run. Always list what was reviewed and what was not
+  in `notes`. Whole-repo coverage is claimed only when the coverage file shows every source file
+  reviewed at its current content.
+- NEVER drop a previous run's finding without re-reading its line. Unfixed bugs carry forward.
+- NEVER report a variant-sweep hit or an invariant violation that has not been through Steps 4
+  and 5 on its own. A matching pattern is a candidate.
 - NEVER re-report issues owned by other dimensions as correctness: pure error-handling gaps →
   `tenet-errors`; security-exploitable logic (IDOR, injection) → `tenet-security`; slow-but-correct
   code → `tenet-performance`. This dimension is for code that produces the *wrong answer*. (If a

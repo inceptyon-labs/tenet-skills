@@ -72,7 +72,7 @@ Search the entire repo (respecting `.gitignore`) for debt markers:
 
 ```bash
 # Get the file list from git to respect .gitignore
-git ls-files | xargs grep -n -i -E '\b(TODO|FIXME|HACK|XXX|KLUDGE|WORKAROUND)\b' 2>/dev/null
+git grep -niP '\b(TODO|FIXME|HACK|XXX|KLUDGE|WORKAROUND)\b'
 ```
 
 For each match, capture:
@@ -193,21 +193,17 @@ Each deprecated API finding:
 Scan for stub/placeholder implementations:
 
 ```bash
-git ls-files | xargs grep -n -E \
-  'throw new Error\(.*(not implemented|TODO|FIXME|stub|placeholder)' \
-  2>/dev/null
+git grep -nP \
+  'throw new Error\(.*(not implemented|TODO|FIXME|stub|placeholder)'
 
-git ls-files | xargs grep -n -E \
-  'raise NotImplementedError|raise NotImplemented' \
-  2>/dev/null
+git grep -nP \
+  'raise NotImplementedError|raise NotImplemented'
 
-git ls-files | xargs grep -n -E \
-  'panic\("not implemented"\)|panic\("TODO"\)|unimplemented!\(\)' \
-  2>/dev/null
+git grep -nP \
+  'panic\("not implemented"\)|panic\("TODO"\)|unimplemented!\(\)'
 
-git ls-files | xargs grep -n -E \
-  'pass\s*#.*TODO|pass\s*#.*stub|pass\s*#.*implement' \
-  2>/dev/null
+git grep -nP \
+  'pass\s*#.*TODO|pass\s*#.*stub|pass\s*#.*implement'
 ```
 
 Stub patterns per language:
@@ -232,19 +228,15 @@ Scan for feature flag patterns that have been "temporary" for too long:
 
 ```bash
 # Common feature flag patterns
-git ls-files | xargs grep -n -i -E \
-  '(feature_flag|featureFlag|FEATURE_|FF_|feature_toggle|isEnabled|is_enabled)\s*[=(]' \
-  2>/dev/null
+git grep -niP \
+  '(feature_flag|featureFlag|FEATURE_|FF_|feature_toggle|isEnabled|is_enabled)\s*[=(]'
 
 # Environment-variable-based flags
-git ls-files | xargs grep -n -E \
-  'process\.env\.(ENABLE_|DISABLE_|USE_NEW_|FEATURE_|FF_)|os\.environ\.get\(.*(ENABLE_|FEATURE_|FF_)' \
-  2>/dev/null
+git grep -nP \
+  'process\.env\.(ENABLE_|DISABLE_|USE_NEW_|FEATURE_|FF_)|os\.environ\.get\(.*(ENABLE_|FEATURE_|FF_)'
 
 # Config-file-based flags
-git ls-files -z -- '*.json' '*.yaml' '*.yml' '*.toml' | xargs -0 grep -n -i -E \
-  '"(feature|flag|toggle|experiment)"' \
-  2>/dev/null
+git grep -niP '"(feature|flag|toggle|experiment)"' -- '*.json' '*.yaml' '*.yml' '*.toml'
 ```
 
 For each flag:
@@ -264,8 +256,7 @@ Hardcoded credentials are primarily a secrets issue, but they are also technical
 
 ```bash
 # Look for hardcoded API keys, tokens, or connection strings in source (not .env files)
-git ls-files -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.java' '*.rb' | \
-  xargs grep -n -E "(api[_-]?key|apiKey|API_KEY|secret[_-]?key|secretKey)\s*[:=]\s*['\"][A-Za-z0-9]" 2>/dev/null
+git grep -nP "(api[_-]?key|apiKey|API_KEY|secret[_-]?key|secretKey)\s*[:=]\s*['\"][A-Za-z0-9]" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.java' '*.rb'
 ```
 
 If found, emit as:
@@ -294,7 +285,7 @@ Write the dimension report to `.healthcheck/reports/debt.json`:
   "key": "debt",
   "score": 78,
   "weight": 1.1,
-  "skill_version": "1.0.0",
+  "skill_version": "1.0.1",
   "applicable": true,
   "notes": "Found 14 aged TODO/FIXME markers (3 over a year old), 2 commented-out code blocks totaling 34 lines, and 1 stub implementation in production code.",
   "metrics": {
