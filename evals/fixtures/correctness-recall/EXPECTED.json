@@ -1,0 +1,185 @@
+{
+  "fixture": "correctness-recall",
+  "description": "Ground truth for benchmarking tenet-correctness. Copy project/ to a scratch directory, make it a git repo, run the skill there, then score .healthcheck/reports/correctness.json with ../../score-fixtures.py. This file stays outside project/ and the source files carry no plant or decoy markers, so the answers are not visible to the model being measured.",
+  "dimension": "correctness",
+  "severity_order": [
+    "info",
+    "minor",
+    "major",
+    "critical"
+  ],
+  "expected_findings": [
+    {
+      "id": "P01",
+      "rule": "CORR-AWAIT-001",
+      "file": "src/billing/withdraw.ts",
+      "class": "async",
+      "min_severity": "critical",
+      "why": "getBalance is not awaited, so the Promise < number check is always false and any withdrawal passes"
+    },
+    {
+      "id": "P02",
+      "rule": "CORR-RACE-001",
+      "file": "src/orders/checkout.ts",
+      "class": "concurrency",
+      "min_severity": "critical",
+      "why": "status read, capture, then status write: two concurrent checkouts both capture"
+    },
+    {
+      "id": "P03",
+      "rule": "CORR-BOUND-001",
+      "file": "src/api/listOrders.ts",
+      "class": "boundary",
+      "min_severity": "major",
+      "why": "pages are 1-based (README, server default 1) but offset = page * size skips the first page"
+    },
+    {
+      "id": "P04",
+      "rule": "CORR-BOUND-001",
+      "file": "src/api/listInvoices.ts",
+      "class": "variant",
+      "min_severity": "major",
+      "why": "same off-by-one under different names; the variant sweep should reach it"
+    },
+    {
+      "id": "P05",
+      "rule": "CORR-INVARIANT-001",
+      "file": "src/billing/refund.ts",
+      "class": "invariant",
+      "min_severity": "critical",
+      "why": "each refund is checked against the order total, not against total minus earlier refunds"
+    },
+    {
+      "id": "P06",
+      "rule": "CORR-IDEMP-001",
+      "file": "src/webhooks/payment.ts",
+      "class": "repeat",
+      "min_severity": "critical",
+      "why": "no dedupe on event id; a redelivered top-up credits the wallet twice"
+    },
+    {
+      "id": "P07",
+      "rule": "CORR-ATOMIC-001",
+      "file": "src/orders/cancel.ts",
+      "class": "atomicity",
+      "min_severity": "major",
+      "why": "refund is issued before two writes with no transaction; a failure leaves a refunded order not cancelled, and a retry refunds again"
+    },
+    {
+      "id": "P08",
+      "rule": "CORR-COND-001",
+      "file": "src/auth/session.ts",
+      "class": "condition",
+      "min_severity": "critical",
+      "why": "comparison is inverted: live sessions are rejected and expired ones accepted"
+    },
+    {
+      "id": "P09",
+      "rule": "CORR-COPY-001",
+      "file": "src/shipping/address.ts",
+      "class": "copy-paste",
+      "min_severity": "major",
+      "why": "shipping.zip is read from body.billing.zip"
+    },
+    {
+      "id": "P10",
+      "rule": "CORR-NULL-001",
+      "file": "src/api/profile.ts",
+      "class": "null",
+      "min_severity": "major",
+      "why": "findUser returns null for missing or soft-deleted users; user! dereferences it"
+    },
+    {
+      "id": "P11",
+      "rule": "CORR-TYPE-001",
+      "file": "src/billing/price.ts",
+      "class": "coercion",
+      "min_severity": "minor",
+      "why": "quantity || 1 turns a quantity of 0 into 1"
+    },
+    {
+      "id": "P12",
+      "rule": "CORR-CONTRACT-001",
+      "file": "src/billing/charge.ts",
+      "class": "contract",
+      "min_severity": "critical",
+      "why": "passes dollars to capture(), which takes cents: orders are charged 1/100 of the total"
+    },
+    {
+      "id": "P13",
+      "rule": "CORR-INVARIANT-001",
+      "file": "src/inventory/reserve.ts",
+      "class": "invariant",
+      "min_severity": "major",
+      "why": "decrements stock with no floor while adjust.ts enforces on_hand >= 0; stock goes negative"
+    }
+  ],
+  "decoys": [
+    {
+      "id": "D1",
+      "file": "src/orders/claim.ts",
+      "label": "atomic-conditional-update",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D2",
+      "file": "src/api/listUsers.ts",
+      "label": "correct-1-based-pagination",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D3",
+      "file": "src/webhooks/shipping.ts",
+      "label": "deduped-webhook",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D4",
+      "file": "src/util/retry.ts",
+      "label": "sequential-await-backoff",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D5",
+      "file": "src/auth/token.ts",
+      "label": "correct-expiry-check",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D6",
+      "file": "src/users/display.ts",
+      "label": "null-handled-and-validated",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D7",
+      "file": "src/legacy/oldRefund.ts",
+      "label": "dead-code",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D8",
+      "file": "src/billing/tax.ts",
+      "label": "integer-cents-rounding",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D9",
+      "file": "src/pricing/rounding.ts",
+      "label": "intended-behaviour-asserted-by-test",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D10",
+      "file": "src/inventory/adjust.ts",
+      "label": "guarded-stock-write",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D11",
+      "file": "src/inventory/restock.ts",
+      "label": "increment-only-write",
+      "allowed_max_severity": null
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+[
+  { "id": "00000000-0000-4000-8000-000000000001", "email": "ada@example.org", "fullName": "Ada Example", "phone": "+1 555 0100" },
+  { "id": "00000000-0000-4000-8000-000000000002", "email": "lin@example.org", "fullName": "Lin Sample", "phone": "+1 555 0101" }
+]

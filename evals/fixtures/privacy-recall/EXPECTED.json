@@ -1,0 +1,143 @@
+{
+  "fixture": "privacy-recall",
+  "description": "Ground truth for benchmarking tenet-privacy-data. Copy project/ to a scratch directory, make it a git repo, run the skill there, then score .healthcheck/reports/privacy-data.json with ../../score-fixtures.py. This file stays outside project/ and the source files carry no plant or decoy markers.",
+  "dimension": "privacy-data",
+  "severity_order": [
+    "info",
+    "minor",
+    "major",
+    "critical"
+  ],
+  "expected_findings": [
+    {
+      "id": "P01",
+      "rule": "PRIV-LOG-001",
+      "file": "src/middleware/requestLogger.ts",
+      "class": "logs",
+      "min_severity": "critical",
+      "why": "logs every request body (passwords, card numbers) and the Authorization header"
+    },
+    {
+      "id": "P02",
+      "rule": "PRIV-LOG-002",
+      "file": "src/api/signup.ts",
+      "class": "logs",
+      "min_severity": "major",
+      "why": "console.log of name, email and phone on every signup"
+    },
+    {
+      "id": "P03",
+      "rule": "PRIV-3P-001",
+      "file": "src/api/payment.ts",
+      "class": "third-party",
+      "min_severity": "critical",
+      "why": "full card number, expiry and CVC attached to the Sentry event"
+    },
+    {
+      "id": "P04",
+      "rule": "PRIV-3P-002",
+      "file": "src/client/analytics.ts",
+      "class": "third-party",
+      "min_severity": "major",
+      "why": "identify() sends email and full name to PostHog"
+    },
+    {
+      "id": "P05",
+      "rule": "PRIV-3P-003",
+      "file": "src/lib/slack.ts",
+      "class": "third-party",
+      "min_severity": "major",
+      "why": "whole user record, including phone and date of birth, posted to a chat webhook"
+    },
+    {
+      "id": "P06",
+      "rule": "PRIV-DEL-002",
+      "file": "src/api/deleteAccount.ts",
+      "class": "deletion",
+      "min_severity": "major",
+      "why": "deletes the users row only; sessions and uploads reference users with no cascade, so the delete fails or leaves them, and stored upload files are never removed"
+    },
+    {
+      "id": "P07",
+      "rule": "PRIV-EXP-001",
+      "file": "src/auth/reset.ts",
+      "class": "expiry",
+      "min_severity": "minor",
+      "why": "reset tokens have no expiry column, are never checked for age and are never deleted after use"
+    },
+    {
+      "id": "P08",
+      "rule": "PRIV-CONS-001",
+      "file": "src/client/boot.ts",
+      "class": "consent",
+      "min_severity": "major",
+      "why": "analytics starts and identifies before the analyticsEnabled setting is read, and nothing ever gates on it"
+    },
+    {
+      "id": "P09",
+      "rule": "PRIV-URL-001",
+      "file": "src/client/invite.ts",
+      "class": "url",
+      "min_severity": "minor",
+      "why": "invitee email and inviter name placed in a query string"
+    },
+    {
+      "id": "P10",
+      "rule": "PRIV-IOS-001",
+      "file": "ios/Clubhouse/LocationService.swift",
+      "class": "permissions",
+      "min_severity": "major",
+      "why": "CLLocationManager used with no NSLocationWhenInUseUsageDescription in Info.plist"
+    }
+  ],
+  "decoys": [
+    {
+      "id": "D1",
+      "file": "src/lib/audit.ts",
+      "label": "opaque-id-only-log",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D2",
+      "file": "src/lib/mailer.ts",
+      "label": "vendor-gets-what-it-needs",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D3",
+      "file": "src/lib/logger.ts",
+      "label": "redacting-logger",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D4",
+      "file": "src/db/models.ts",
+      "label": "field-inventory-only",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D5",
+      "file": "src/db/schema.sql",
+      "label": "schema-fields-are-not-findings",
+      "allowed_max_severity": "minor"
+    },
+    {
+      "id": "D6",
+      "file": "ios/Clubhouse/CameraService.swift",
+      "label": "declared-permission",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D7",
+      "file": "tests/fixtures/members.json",
+      "label": "test-data",
+      "allowed_max_severity": null
+    },
+    {
+      "id": "D8",
+      "file": "src/client/settings.ts",
+      "label": "the-setting-itself",
+      "allowed_max_severity": null
+    }
+  ]
+}

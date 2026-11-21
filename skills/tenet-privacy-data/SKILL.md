@@ -42,6 +42,12 @@ These are **not** findings, at any severity:
 - A log or analytics call that carries only an opaque internal ID.
 - Anything in tests, fixtures, seed scripts or examples.
 - A sink that receives a value already hashed, masked or truncated before the call.
+- A call into a reporter or analytics SDK that the project never initializes. Find the `init` or
+  `configure` call before reporting what is sent to it.
+
+**Reachable** here means the platform or a caller can run it: a route handler, a view, an app or
+scene delegate, a module the entry point imports, an exported function a tracked file calls. An
+exported function nothing references is dead code under `shared/verification.md` and is dropped.
 
 Zero findings is the normal result for a small local-first app. Do not fill a step to show you
 looked.
@@ -66,7 +72,7 @@ tool that stores no user records, sends no telemetry and requests no device perm
 before deciding:
 
 ```bash
-git grep -lP "@Model\b|NSManagedObject|pgTable\(|sqliteTable\(|mysqlTable\(|models\.Model\b|\(BaseModel\)|@Entity\b|@JsonSerializable|CKRecord\(|createTable|CREATE TABLE" -- '*.swift' '*.ts' '*.tsx' '*.js' '*.py' '*.kt' '*.java' '*.dart' '*.sql' '*.prisma' | head -40
+git grep -lPi "@Model\b|NSManagedObject|pgTable\(|sqliteTable\(|mysqlTable\(|models\.Model\b|\(BaseModel\)|@Entity\b|@JsonSerializable|CKRecord\(|createTable|CREATE TABLE" -- '*.swift' '*.ts' '*.tsx' '*.js' '*.py' '*.kt' '*.java' '*.dart' '*.sql' '*.prisma' | head -40
 git grep -lPi "sentry|bugsnag|crashlytics|posthog|mixpanel|amplitude|segment|firebase_analytics|FirebaseAnalytics|gtag\(|plausible|datadog|logrocket|fullstory|intercom|revenuecat" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.swift' '*.dart' '*.kt' '*.java' '*.json' '*.yaml' '*.resolved' 'Podfile' '*.gradle' | head -40
 git ls-files -- '*Info.plist' '*PrivacyInfo.xcprivacy' '*AndroidManifest.xml' '*.entitlements'
 ```
@@ -100,11 +106,19 @@ Categories:
 - **credential**: passwords, tokens, API keys, session secrets
 - **sensitive**: government ID, payment card or bank number, health, biometric, precise location,
   data about children, ethnicity, religion
-- **contact**: email, phone, postal address, full name
+- **contact**: email, phone, postal address, full name, date of birth
 - **identifier**: user ID, device ID, IP address, username
 
 Add free-text fields the user fills in (notes, messages, uploads): they hold whatever the user
 typed, so treat them as **contact** unless the app's purpose makes them **sensitive**.
+
+Some personal values are never stored and only pass through a request: a card number sent on to
+a processor, a password before hashing. Add them to the inventory too, from the request schemas
+and handler parameters:
+
+```bash
+git grep -nPi "\b(card_?number|cvc|cvv|pan|password|passcode|ssn|passport|date_?of_?birth)\b" -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.py' '*.go' '*.swift' '*.dart' '*.kt' '*.rb' ':!*.test.*' ':!*.spec.*' | head -100
+```
 
 The inventory itself is never a finding. It is what Step 3 traces.
 
@@ -184,6 +198,10 @@ nothing). Uploaded files, sessions, refresh tokens and rows in other services co
 - A soft delete (`deleted_at`, `is_deleted`) with nothing that ever purges the row: one finding.
   Search for the purge job before reporting it.
 
+While the route list is open, note whether any route or job gives a user a copy of their own data
+(an export, a download, a "my data" endpoint). Record it as `has_export_flow`; its absence is the
+`info` row in Step 7.
+
 ### Step 5: Expiry of short-lived data (operated store and vendor backend only)
 
 Some records are only meant to live briefly. Check that each one can expire:
@@ -206,7 +224,9 @@ git grep -nPi "consent|cookie[_-]?banner|opt[_-]?(out|in)|do[_-]?not[_-]?track|(
 
 For each analytics or reporting SDK from Step 3b, confirm its initialization and its calls sit
 behind that setting. An SDK that starts before the choice is read, or keeps sending after
-opt-out, is a finding. No consent mechanism in the code means nothing to check here.
+opt-out, is a finding. No consent mechanism in the code means nothing to check here. Hold each SDK
+to the setting that names it: an "analytics" toggle gates analytics, not crash reporting, unless
+its label or the docs say it covers both.
 
 **b. iOS and macOS.** List the protected APIs the app uses and the purposes it declares:
 
@@ -217,8 +237,9 @@ git ls-files -- '*PrivacyInfo.xcprivacy'
 ```
 
 - A protected API in use with no matching `NS…UsageDescription` (in `Info.plist`, or as
-  `INFOPLIST_KEY_…` in the project file): the app is terminated the first time it touches that
-  API. Finding.
+  `INFOPLIST_KEY_…` in the project file). The feature cannot work: for camera, microphone,
+  photos, contacts and calendars the system terminates the app on first access; for location it
+  ignores the authorization request. Finding.
 - `ASIdentifierManager` or an ad or attribution SDK in use with no
   `requestTrackingAuthorization` call: finding.
 - The app ships a tracking SDK, or uses a required-reason API (`UserDefaults`, file timestamps,
@@ -258,6 +279,9 @@ the file you read first. Group the same flow repeated across files into one find
 | Required-reason API or tracking SDK with no privacy manifest; unused dangerous Android permission | minor |
 | Accounts in an operated store with no way for a user to get a copy of their data | info |
 
+The table already reflects how sensitive each path is. Do not add the critical-path escalation from
+`shared/severity.md` on top of it; the systemic escalation (same flow in 5+ files) still applies.
+
 ```text
 score = max(0, min(100, int((100 - 5*critical - 2*major - 0.5*minor) + 0.5)))
 ```
@@ -291,16 +315,18 @@ Apply suppressions (`shared/suppressions.md`). Write `.healthcheck/reports/priva
     { "name": "Logs", "status": "passed", "count": 0, "description": "31 log calls and the request logger read; no personal field reaches a log" },
     { "name": "Error reporters and analytics", "status": "failed", "count": 1, "description": "identify() receives the user's email" },
     { "name": "Other third parties", "status": "passed", "count": 0 },
+    { "name": "URLs", "status": "passed", "count": 0 },
     { "name": "Deletion coverage", "status": "passed", "count": 0, "description": "Delete path removes all 5 user-linked tables" },
     { "name": "Expiry of short-lived data", "status": "failed", "count": 1 },
     { "name": "Consent gates", "status": "skipped", "description": "No consent mechanism in the code" },
-    { "name": "Device permissions and manifests", "status": "failed", "count": 1 }
+    { "name": "Device permissions and manifests", "status": "failed", "count": 1 },
+    { "name": "Data export", "status": "info", "description": "No route or job gives a user a copy of their data" }
   ],
   "findings": [ ... ]
 }
 ```
 
-Mark a check `skipped` when the residency in Step 1
+Set `skill_version` to `1.1.0`. Mark a check `skipped` when the residency in Step 1
 rules it out, and say why in its `description`. Delete `.healthcheck/tmp/privacy-data-*` when done.
 
 Every finding MUST include:
@@ -309,8 +335,9 @@ Every finding MUST include:
 - `file` and a 1-based `line` for the sink (flows) or the incomplete code (gaps); `line: null`
   and `Line: N/A` in the fix_prompt only when no single location exists (no delete path at all)
 - `snippet` with the offending line, values redacted
-- `confidence`: `native` when the flow was traced in a native-support language, `heuristic`
-  otherwise, `deterministic` for a toolchain import
+- `confidence`: `native` when the flow or gap was confirmed by reading code in a native-support
+  language, `heuristic` otherwise (including gaps established from config files alone),
+  `deterministic` for a toolchain import
 - `fix_prompt` following `shared/fix_prompt_template.md`, with `- File:`, `- Line:` and
   `- Dimension:` in its Location section
 

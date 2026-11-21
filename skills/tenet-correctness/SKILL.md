@@ -302,7 +302,8 @@ score = 100 - (5 * critical + 2 * major + 0.5 * minor)
 score = max(0, min(100, int(score + 0.5)))
 ```
 
-Apply suppressions (`shared/suppressions.md`). Write `.healthcheck/reports/correctness.json`:
+Apply suppressions (`shared/suppressions.md`). Write `.healthcheck/reports/correctness.json`, with
+`skill_version` set to `1.1.0`:
 
 ```json
 {

@@ -15,7 +15,7 @@ Info findings do not affect the score.
 |---|---|
 | credential | passwords, tokens, API keys, session secrets |
 | sensitive | government ID, payment card or bank number, health, biometric, precise location, children's data, ethnicity, religion |
-| contact | email, phone, postal address, full name, free text the user writes |
+| contact | email, phone, postal address, full name, date of birth, free text the user writes |
 | identifier | user ID, device ID, IP address, username |
 
 ## Finding Categories
@@ -47,7 +47,7 @@ Info findings do not affect the score.
 | ID | Finding | Severity | Confidence |
 |---|---|---|---|
 | PRIV-CONS-001 | Analytics or reporting SDK ignores the project's own consent or opt-out setting | major | native / heuristic |
-| PRIV-IOS-001 | Protected iOS/macOS API used with no matching purpose string | major | deterministic / heuristic |
+| PRIV-IOS-001 | Protected iOS/macOS API used with no matching purpose string | major | native / heuristic |
 | PRIV-IOS-002 | Advertising identifier or attribution SDK used with no tracking authorization request | major | heuristic |
 | PRIV-IOS-003 | Required-reason API or tracking SDK with no `PrivacyInfo.xcprivacy` | minor | heuristic |
 | PRIV-AND-001 | Dangerous Android permission declared that no code or plugin uses | minor | heuristic |

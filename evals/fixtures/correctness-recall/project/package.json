@@ -1,0 +1,7 @@
+{
+  "name": "storefront-api",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "vitest run" },
+  "dependencies": { "hono": "^4.6.0", "zod": "^3.23.0", "postgres": "^3.4.0" }
+}

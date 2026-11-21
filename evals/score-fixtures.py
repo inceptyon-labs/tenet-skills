@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score a tenet-security run against a fixture's ground-truth manifest.
+"""Score a Tenet dimension run against a fixture's ground-truth manifest.
 
 Measures recall (did the skill catch the planted vulnerabilities?) and precision
 (did it avoid flagging the safe decoys?), broken down by vulnerability class.
@@ -44,6 +44,17 @@ def file_matches(finding_file: str, expected_file: str) -> bool:
     return ff == ef or ff.endswith("/" + ef) or ef.endswith("/" + ff) or os.path.basename(ff) == os.path.basename(ef)
 
 
+def mentions(finding, expected_file: str) -> bool:
+    """True when a finding names the file in its text.
+
+    A systemic finding lists its other occurrences in the description instead of emitting one
+    finding per file (shared/scan-discipline.md section 4), so a plant can be caught without
+    being the finding's primary `file`. Used for recall only, never for decoys.
+    """
+    text = " ".join(str(finding.get(k, "")) for k in ("description", "title", "snippet")).lower()
+    return norm(expected_file) in text.replace("\\", "/")
+
+
 def sev(finding) -> int:
     return SEV_ORDER.get(str(finding.get("severity", "info")).lower(), 0)
 
@@ -51,7 +62,7 @@ def sev(finding) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--expected", required=True)
-    ap.add_argument("--report", required=True, help="produced security.json")
+    ap.add_argument("--report", required=True, help="produced dimension report, e.g. security.json or correctness.json")
     ap.add_argument("--secrets", help="produced secrets.json (optional, for secrets decoys)")
     ap.add_argument("--min-recall", type=float, default=0.8)
     args = ap.parse_args()
@@ -69,7 +80,8 @@ def main() -> int:
     for exp in expected["expected_findings"]:
         need = SEV_ORDER[exp["min_severity"]]
         hit = next(
-            (fd for fd in all_findings if file_matches(fd.get("file", ""), exp["file"]) and sev(fd) >= need),
+            (fd for fd in all_findings
+             if (file_matches(fd.get("file", ""), exp["file"]) or mentions(fd, exp["file"])) and sev(fd) >= need),
             None,
         )
         cls = exp["class"]

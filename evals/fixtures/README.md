@@ -1,4 +1,4 @@
-# Tenet security fixtures
+# Tenet fixtures
 
 Deliberately vulnerable code used to **measure** the `tenet-security` skill instead of
 guessing whether prompt changes help. Every fixture file is either a planted vulnerability
@@ -75,3 +75,50 @@ Add a planted file with a `// PLANT <RULE-ID>` comment and an entry in `expected
 decoy with a `// DECOY` comment and an entry in `decoys` (set `allowed_max_severity` to the
 highest severity that is acceptable, or `null` for "must not appear at all"). The scorer keys on
 `file` + severity, so line numbers don't need to stay in sync.
+
+---
+
+# Correctness and privacy fixtures
+
+`correctness-recall/` and `privacy-recall/` measure `tenet-correctness` and `tenet-privacy-data`
+the same way, with two differences from the security fixture:
+
+- **The answer key is outside the scanned code.** Each fixture is `EXPECTED.json` plus a
+  `project/` directory. Only `project/` is copied and scanned.
+- **The code carries no plant or decoy markers.** The model being measured sees an ordinary small
+  repository and nothing that names the bugs.
+
+| Fixture | Plants | Decoys | What the plants need |
+|---|---|---|---|
+| `correctness-recall` | 13 | 11 | Tracing across files: a caller contract (`cents` vs dollars, a nullable return), two invariants broken by one write site each, a variant of one bug in a second endpoint, a webhook with no dedupe, a refund issued before non-transactional writes |
+| `privacy-recall` | 10 | 8 | Following a field into a sink: request logger, signup log, error reporter, analytics identify, chat webhook; plus a deletion path checked against the schema, reset tokens with no expiry, a consent setting nothing reads, an email in a URL, and an iOS API with no purpose string |
+
+## How to run
+
+```bash
+rm -rf /tmp/tenet-fx && cp -r evals/fixtures/correctness-recall/project /tmp/tenet-fx
+cd /tmp/tenet-fx && git init -q && git add -A && git commit -qm fixture
+```
+
+Run the skill with `/tmp/tenet-fx` as the project root, on the model the orchestrator would use
+for it (the `judge` tier). Tell it not to read `evals/`. Then score:
+
+```bash
+python3 evals/score-fixtures.py \
+  --expected evals/fixtures/correctness-recall/EXPECTED.json \
+  --report   /tmp/tenet-fx/.healthcheck/reports/correctness.json
+```
+
+Use `privacy-recall` and `privacy-data.json` for the other one. The scorer credits a plant when a
+finding's `file` matches it, or when a finding names the file in its description, because a
+systemic finding lists its other occurrences there instead of repeating itself per file.
+
+## Recorded runs
+
+| Date | Fixture | Skill | Model | Recall | Decoy FPs | Notes |
+|---|---|---|---|---|---|---|
+| 2026-11-21 | correctness-recall (first draft) | correctness 1.1.0 | fable | 13/13 found, 12/13 at expected severity | 1 | The flagged decoy was a real bug in the fixture (event marked processed outside the transaction). The run also found three more unplanned bugs in the fixture. All four are fixed, and the one severity expectation that was too strict (`quantity || 1`) is lowered to `minor`. Not re-run since. |
+| 2026-11-21 | privacy-recall (first draft) | privacy-data 1.1.0 | fable | 10/10 | 0 | The run reported nine places where the skill text was unclear; those are fixed in the skill, and the fixture gained the client and iOS entry points and the `Sentry.init` it was missing. Not re-run since. |
+
+Both fixtures are small enough that every file is read, so they measure detection and
+calibration, not review-set selection or coverage rotation.

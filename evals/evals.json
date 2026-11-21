@@ -68,8 +68,8 @@
     {
       "id": 5,
       "name": "ops-privacy-supplychain-infra-db-release",
-      "prompt": "Run the tenet-privacy-data, tenet-supply-chain-license, tenet-infra-cloud, tenet-database-migrations, and tenet-release-ops skills against this codebase. Check PII handling and retention, SBOM/license/provenance gaps, infrastructure-as-code exposure, migration safety, and release/rollback readiness. Write findings to .healthcheck/reports/privacy-data.json, .healthcheck/reports/supply-chain-license.json, .healthcheck/reports/infra-cloud.json, .healthcheck/reports/database-migrations.json, and .healthcheck/reports/release-ops.json. If a dimension is not applicable, set score to null and applicable to false.",
-      "expected_output": "Five JSON files. Applicable dimensions should include scored findings with fix_prompts and confidence tiers; non-applicable dimensions should set score to null and applicable to false. All findings must follow the Tenet location contract for file/line and fix_prompt Location.",
+      "prompt": "Run the tenet-privacy-data, tenet-supply-chain-license, tenet-infra-cloud, tenet-database-migrations, and tenet-release-ops skills against this codebase. Classify where personal data lives, inventory personal fields and trace them into logs, analytics and third parties; check deletion coverage, expiry, consent gates and device permissions; SBOM/license/provenance gaps, infrastructure-as-code exposure, migration safety, and release/rollback readiness. Write findings to .healthcheck/reports/privacy-data.json, .healthcheck/reports/supply-chain-license.json, .healthcheck/reports/infra-cloud.json, .healthcheck/reports/database-migrations.json, and .healthcheck/reports/release-ops.json. If a dimension is not applicable, set score to null and applicable to false.",
+      "expected_output": "Five JSON files. Applicable dimensions should include scored findings with fix_prompts and confidence tiers; non-applicable dimensions should set score to null and applicable to false. All findings must follow the Tenet location contract for file/line and fix_prompt Location. privacy-data.json must state the residency classification in notes, report flows and gaps only (never a bare field or a missing policy), and skip deletion and expiry checks for device-only data. release-ops, supply-chain-license, infra-cloud and database-migrations must state the project scale (solo or team) in notes and report absence-of-process findings as info at solo scale.",
       "skill_paths": [
         "skills/tenet-privacy-data/SKILL.md",
         "skills/tenet-supply-chain-license/SKILL.md",
@@ -83,8 +83,8 @@
     {
       "id": 6,
       "name": "correctness-logic-bugs",
-      "prompt": "Run the tenet-correctness skill against this codebase. Select a bounded review set from critical paths (auth, payments, data mutation), churn hotspots, and entry-point handlers, then read each unit and trace concrete inputs looking for logic bugs: off-by-one, inverted conditions, wrong-variable copy-paste, missing await, race conditions, null paths, and type-coercion errors. State a concrete failing input for every major/critical finding. Write findings to .healthcheck/reports/correctness.json following the Tenet report schema.",
-      "expected_output": "One JSON file. correctness.json must select a bounded review set (not the whole repo) and state which files were and were not reviewed in notes. Every major/critical finding must include a concrete 'input X -> wrong output Y' scenario, a snippet, and a fix_prompt. Must use the scoring formula and honor suppressions.",
+      "prompt": "Run the tenet-correctness skill against this codebase. Select a bounded review set, filling the budget with code that is new, changed or not yet reviewed according to .healthcheck/state/correctness-coverage.json, then read each unit and trace concrete inputs looking for logic bugs. Run the invariant pass over money and status write sites and the variant sweep for each confirmed bug. Carry forward and re-verify findings from the previous correctness.json if one exists. State a concrete failing input for every finding. Write findings to .healthcheck/reports/correctness.json following the Tenet report schema.",
+      "expected_output": "correctness.json plus an updated .healthcheck/state/correctness-coverage.json. The report must select a bounded review set (not the whole repo) and state which files were and were not reviewed in notes. Every finding must include a concrete 'input X -> wrong output Y' scenario, a snippet, and a fix_prompt. Metrics must include invariants_checked, variant_sweeps and carried_forward. Variants of one root cause are folded into one finding that lists every file:line. Must use the scoring formula and honor suppressions.",
       "skill_paths": [
         "skills/tenet-correctness/SKILL.md"
       ],
@@ -98,6 +98,28 @@
       "expected_output": "security.json plus a passing score run: recall >= 80% of the 23 planted vulnerabilities across all classes (SQL/command/XSS/NoSQL injection, IDOR, tenant isolation, mass assignment, path traversal, JWT alg-none, timing-unsafe compare, weak hashing, weak random, SSRF, CORS, unverified webhook, prototype pollution, zip-slip, default creds, unsafe yaml.load, mobile insecure storage, unvalidated root XPC listener, hardlink-redirectable root file op, DNS-rebindable localhost server) AND zero false positives on the 12 safe decoys (parameterized query, Drizzle sql tagged template, DOMPurify-wrapped HTML, execFile array, Math.random jitter, sha1 cache key, ownership-scoped query, publishable Stripe key, allowlisted SSRF, Team-ID-pinned XPC requirement, Host-checked loopback server without token, same-user subprocess).",
       "skill_paths": [
         "skills/tenet-security/SKILL.md"
+      ],
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 8,
+      "name": "correctness-fixture-recall",
+      "prompt": "Copy evals/fixtures/correctness-recall/project/ to a scratch directory, make it a git repository, and run the tenet-correctness skill with that directory as the project root. Do not read evals/fixtures/correctness-recall/EXPECTED.json. Write findings to .healthcheck/reports/correctness.json. Then score with: python3 evals/score-fixtures.py --expected evals/fixtures/correctness-recall/EXPECTED.json --report <scratch>/.healthcheck/reports/correctness.json",
+      "expected_output": "correctness.json plus a passing score run: recall >= 80% of the 13 planted bugs (missing await, check-then-act race, pagination off-by-one and its variant in a second endpoint, refunds that can exceed the charge, webhook credited twice on redelivery, refund before non-transactional writes, inverted session expiry, copy-paste zip, null dereference of a soft-deleted user, quantity 0 coerced to 1, dollars passed where cents are expected, stock decremented below zero) AND zero false positives on the 11 decoys (atomic conditional update, correct 1-based pagination, deduped webhook, sequential retry backoff, correct expiry check, validated and null-guarded lookup, dead code, integer-cents rounding, intended rounding asserted by a test, guarded stock write, increment-only write).",
+      "skill_paths": [
+        "skills/tenet-correctness/SKILL.md"
+      ],
+      "files": [],
+      "assertions": []
+    },
+    {
+      "id": 9,
+      "name": "privacy-fixture-recall",
+      "prompt": "Copy evals/fixtures/privacy-recall/project/ to a scratch directory, make it a git repository, and run the tenet-privacy-data skill with that directory as the project root. Do not read evals/fixtures/privacy-recall/EXPECTED.json. Write findings to .healthcheck/reports/privacy-data.json. Then score with: python3 evals/score-fixtures.py --expected evals/fixtures/privacy-recall/EXPECTED.json --report <scratch>/.healthcheck/reports/privacy-data.json",
+      "expected_output": "privacy-data.json plus a passing score run: recall >= 80% of the 10 planted issues (request logger dumping bodies and auth headers, signup logging name/email/phone, card details attached to an error report, email and name sent to analytics identify, full user record posted to a chat webhook, account deletion that leaves sessions and uploads, reset tokens that never expire, analytics that ignores the opt-out setting, email in a query string, location API with no purpose string) AND zero false positives on the 8 decoys (opaque-ID log, email provider receiving the address it needs, redacting logger, model types, schema fields, a declared camera permission, test data, the settings module).",
+      "skill_paths": [
+        "skills/tenet-privacy-data/SKILL.md"
       ],
       "files": [],
       "assertions": []
