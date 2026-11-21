@@ -180,6 +180,60 @@ const event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret)
 
 ---
 
+## macOS privileged helpers, local servers, subprocesses
+
+First ask which boundary the code crosses: user → root, web page → app, other local app → app,
+network → app. Same-user code acting on the user's own files crosses none: drop it.
+
+✅ **Flag** — XPC listener that accepts any peer, or checks the peer by PID:
+```swift
+func listener(_ l: NSXPCListener, shouldAcceptNewConnection c: NSXPCConnection) -> Bool {
+    c.exportedObject = service; c.resume(); return true          // no peer check
+}
+SecCodeCopyGuestWithAttributes(nil, [kSecGuestAttributePid: c.processIdentifier] as CFDictionary, [], &code)  // PID reuse race
+```
+
+🚫 **Do NOT flag** — framework-enforced requirement pinning identifier and Team ID:
+```swift
+c.setCodeSigningRequirement(#"identifier "com.acme.app" and anchor apple generic and certificate leaf[subject.OU] = "ABCDE12345""#)
+```
+
+✅ **Flag** — root helper acting by path with only a symlink guard (a hardlink passes it):
+```swift
+guard url.resolvingSymlinksInPath().path == url.standardizedFileURL.path else { throw … }
+try fm.moveItem(at: url, to: trashURL)
+lchown(trashURL.path, uid, gid)              // inode may be /etc/sudoers
+```
+
+🚫 **Do NOT flag** — link-count check and descriptor-relative operations:
+```swift
+var st = stat(); guard lstat(path, &st) == 0, st.st_nlink == 1 else { throw … }
+let parent = try openDirectoryNoFollow(parentComponents)   // O_NOFOLLOW per component
+renameatx_np(parent, leaf, trashFd, leaf, UInt32(RENAME_EXCL))
+```
+Also do NOT flag `FileManager.removeItem`/`moveItem` on user paths in the app process (runs as
+the user, no boundary), unless the path comes from outside the app (an HTTP request, URL
+scheme, XPC message). Then the web page or other app is the boundary, so flag it under the
+matching rule.
+
+✅ **Flag** — loopback server with destructive endpoints and no `Host` allowlist (DNS
+rebinding), or `NWListener(using: .tcp, on: port)` with no `requiredLocalEndpoint` (binds every
+interface).
+
+🚫 **Do NOT flag above `info`** — loopback-bound server that validates `Host` against
+`127.0.0.1`/`::1`/`localhost` but has no bearer token. Any native process as the user already
+has the user's privileges.
+
+✅ **Flag** — root process running a tool it found on a user-writable path:
+```swift
+p.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/brew")   // inside the helper
+```
+
+🚫 **Do NOT flag** — the same call in the user-context app with an argv array. Same user, no
+boundary.
+
+---
+
 ## Publishable / public-by-design keys (secrets dimension)
 
 🚫 **Do NOT flag as critical** — keys that are safe to ship in client code:

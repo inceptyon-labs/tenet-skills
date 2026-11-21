@@ -49,7 +49,7 @@ support:
   heuristic: [dart, terraform, php, csharp, cpp, c, shell]
   config-only: [yaml, json, dockerfile]
   skip: [markdown, css]
-platform_playbooks: [tauri, electron, flutter, ios-swift, llm-app]
+platform_playbooks: [tauri, electron, flutter, ios-swift, macos-app, llm-app]
 ```
 
 ## Toolchain Inputs
@@ -320,6 +320,121 @@ Flag: ATS disabled (`NSAllowsArbitraryLoads = true`) → `major`; secrets/tokens
 Keychain accessibility (`kSecAttrAccessibleAlways`) → `minor`; CloudKit public-DB write scopes
 on user data → `major`.
 
+**macOS app (Swift/AppKit/SwiftUI desktop).** Run when the census shows Swift and any of:
+`Package.swift` with `.macOS(`, `MACOSX_DEPLOYMENT_TARGET`, `NSXPCListener`, `SMAppService`,
+`SMJobBless`, Sparkle, a `LaunchDaemons`/`LaunchAgents` plist, or a `.entitlements` file. Also run
+the iOS/Swift greps above for storage and transport. The local attack surface matters more than
+the network surface here, so for every candidate, first name the **boundary it crosses**:
+user → root (privileged helper), web page → app (localhost server, URL scheme), another local
+app → app (XPC, injected code inheriting this app's TCC grants or helper trust), network → app
+(updates). Code acting as the same user on the user's own files crosses no boundary, so it is
+not a security finding. See `shared/security-calibration.md` § macOS.
+
+1. **Privileged helper / XPC client validation** (`SEC-MACOS-001`):
+   ```bash
+   git grep -nE "NSXPCListener|shouldAcceptNewConnection|setCodeSigningRequirement|setConnectionCodeSigningRequirement|SecCodeCopyGuestWithAttributes|kSecGuestAttribute(Pid|Audit)|SMAuthorizedClients|SMPrivilegedExecutables" -- '*.swift' '*.m' '*.plist'
+   git grep -nE "AuthorizationExecuteWithPrivileges|with administrator privileges" -- '*.swift' '*.m' '*.applescript'
+   ```
+   Read every `shouldAcceptNewConnection`. Flag: returns `true` with no code-signing check of the
+   peer → `critical` when the listener runs as root, `major` otherwise. Peer checked by **PID**
+   (`processIdentifier`, `kSecGuestAttributePid`) instead of audit token or
+   `setCodeSigningRequirement` → `major` (PID-reuse race). Requirement string without the Team ID
+   (`certificate leaf[subject.OU] = "<TEAM>"`), e.g. `identifier "com.x"` alone → `major`.
+   `SMAuthorizedClients` only governs install, not who connects, so it is not a connection check.
+   Then list each method on the exported protocol. A helper method that takes a raw path,
+   command, URL or plist from the client and acts on it as root without the helper itself
+   enforcing an allowlist → `critical` (the helper is the trust boundary, so checks done only in
+   the app don't count). If the helper has an allowlist that links or races can bypass, report
+   it once under `SEC-MACOS-002`. Cite the line where the unsafe action happens (`return true`
+   with no check before it; the `chown`/`moveItem` call), not the guard. `AuthorizationExecuteWithPrivileges` → `major` (deprecated, no caller
+   validation). AppleScript `do shell script … with administrator privileges` with an
+   interpolated path or argument → `critical`.
+
+2. **Filesystem operations in a privileged context** (`SEC-MACOS-002`). Applies to code in the
+   helper/daemon target or in any process running as root:
+   ```bash
+   git grep -nE "removeItem|moveItem|copyItem|replaceItem|trashItem|createSymbolicLink|setAttributes|\b(l|f)?chown\(|\b(l|f)?chmod\(|\bunlink\(|\brename\(" -- '*Helper*/*.swift' '*Daemon*/*.swift'
+   git grep -nE "resolvingSymlinksInPath|standardizedFileURL|st_nlink|O_NOFOLLOW|openat|unlinkat|renameatx_np|fstatat|AT_SYMLINK_NOFOLLOW" -- '*.swift'
+   ```
+   Root acting **by path** on anything under a directory a less-privileged user can write
+   (`/tmp`, `/private/var/tmp`, `/Library/Caches`, `/Users/*`, shared app-support dirs) can be
+   redirected by a planted symlink, a planted **hardlink**, or a swap between check and use.
+   Flag → `critical`:
+   - The only guard is a lexical or symlink check (`resolvingSymlinksInPath() == path`,
+     `standardizedFileURL`, a `..` reject). A hardlink is not a symlink and passes it. Any
+     unprivileged user can hardlink a root-owned file it cannot read, such as `/etc/sudoers`,
+     into `/private/tmp`; macOS has no `protected_hardlinks`.
+   - `chown`/`lchown`/`setAttributes(.ownerAccountID)` on a path to give a file to the user. If
+     the inode is shared with a system file, the user now owns the system file.
+   - Check-then-act by path (`fileExists`/`attributesOfItem`, then `removeItem`/`moveItem`).
+   Sound pattern (do NOT flag): `lstat` and refuse regular files with `st_nlink > 1`, open parents
+   with an `O_NOFOLLOW` component walk, act on the leaf with `unlinkat`/`renameatx_np`/`fchown`
+   relative to the pinned descriptor, and never transfer ownership of a root-owned inode.
+   The helper target often calls into a shared module, so follow every call from the exported
+   methods instead of trusting the grep's path filter. The same patterns in a process running as
+   the user are not findings.
+
+3. **Localhost servers** (`SEC-MACOS-003`):
+   ```bash
+   git grep -nE "NWListener|requiredLocalEndpoint|requiredInterfaceType|GCDWebServer|Swifter|HttpServer|FlyingFox|Telegraph|Vapor|\bbind\(|INADDR_ANY|0\.0\.0\.0" -- '*.swift' '*.m'
+   git grep -nE "\"[Hh]ost\"|\"[Oo]rigin\"|Access-Control-Allow-Origin" -- '*.swift'
+   ```
+   A web page in any browser on the machine can reach `127.0.0.1`. Flag: a server meant to be
+   local that binds all interfaces → `major`. `NWListener(using:on:)` with no
+   `requiredLocalEndpoint` or `requiredInterfaceType = .loopback` binds every interface. No
+   `Host` header allowlist (`127.0.0.1`, `::1`, `localhost`), so DNS rebinding works → `major`
+   when any endpoint mutates state, deletes or runs things; `minor` for read-only. State-changing
+   endpoints that accept simple cross-origin requests (form/`text/plain` POST, GET with side
+   effects) with no `Origin` check, or with `Access-Control-Allow-Origin: *` → `major`. A loopback
+   server with `Host`/`Origin` validation but no bearer token → `info`; any native process running
+   as the user already has the user's privileges.
+
+4. **Custom URL schemes and Apple Events** (`SEC-MACOS-004`):
+   ```bash
+   git grep -nE "CFBundleURLSchemes" -- '*.plist'
+   git grep -nE "kAEGetURL|onOpenURL|application\(_ [a-z]+: NSApplication, open urls|handleGetURLEvent|NSAppleScript\(source:" -- '*.swift'
+   ```
+   Any web page can launch `scheme://…`. Flag: a handler that deletes, moves, executes, installs,
+   changes settings or opens a path taken from the URL without a user confirmation step →
+   `major`. A handler that only selects a screen or tab is not a finding. `NSAppleScript(source:)`
+   with an interpolated string from outside the app → `major` (script injection).
+
+5. **Updates and downloaded installs** (`SEC-MACOS-005`):
+   ```bash
+   git grep -nE "SUFeedURL|SUPublicEDKey|SUPublicDSAKeyFile|SPUStandardUpdaterController|SUUpdater" -- '*.plist' '*.swift' '*.xcconfig'
+   git grep -nE "hdiutil|installer\s+-pkg|ditto|SecStaticCodeCheckValidity|SecRequirementCreateWithString|codesign\s+--verify|spctl" -- '*.swift' '*.sh'
+   ```
+   Flag: Sparkle `SUFeedURL` over `http://` → `major` (`critical` if there is also no
+   `SUPublicEDKey`); Sparkle 2 with no `SUPublicEDKey` → `major`. A custom updater or app
+   installer that downloads a DMG/zip/pkg and installs it without verifying the code signature
+   against a requirement that pins the **expected Team ID** → `major` (`critical` when the
+   install runs as root or uses `installer -pkg`). A signature check without a Team ID pin
+   accepts any developer's signed app. Checksums from the same server as the download add
+   nothing.
+
+6. **Hardened runtime and injection entitlements** (`SEC-MACOS-006`):
+   ```bash
+   git grep -nE "disable-library-validation|allow-dyld-environment-variables|allow-unsigned-executable-memory|get-task-allow|com\.apple\.security\.app-sandbox" -- '*.entitlements' '*.plist'
+   git grep -nE "ENABLE_HARDENED_RUNTIME|--options[= ]runtime|codesign " -- '*.pbxproj' '*.xcconfig' '*.sh' 'Makefile' '*.yml'
+   ```
+   Code injected into an app inherits its TCC grants (Full Disk Access, Accessibility, Automation)
+   and satisfies any helper's code-signing requirement for that app. Flag in a release build:
+   `disable-library-validation` or `allow-dyld-environment-variables` → `major`, `critical` when
+   a root helper trusts this app's signature. `get-task-allow` in release entitlements → `major`.
+   Release signing script missing `--options runtime` → `major`. The flag is often on a
+   continuation line below `codesign \`, so read the whole invocation before flagging. Skip
+   debug-only entitlement files and scripts that are clearly dev-only (ad-hoc `--sign -`).
+
+7. **Subprocesses from a privileged process** (`SEC-MACOS-007`):
+   ```bash
+   git grep -nE "Process\(\)|executableURL|launchPath|posix_spawn|\.environment\s*=|DYLD_" -- '*.swift'
+   ```
+   Flag: a root process executing a binary at a path a user can write (Homebrew prefix,
+   `~/`, `/usr/local/bin` when user-owned) or resolved through `PATH` → `critical`; a root process
+   passing its inherited environment with `DYLD_*` or `PATH` to children → `major`. Command
+   strings via `/bin/sh -c` with interpolation are Step 4 command injection. A user-context app
+   running user-installed tools with argv arrays crosses no boundary: not a finding.
+
 **LLM apps (agent/MCP/tool-use surface — check when the census shows `@anthropic-ai`,
 `openai`, `langchain`, tool/function definitions):**
 - Prompt/tool-injection: untrusted content (web page, email, file, DB row) concatenated into a
@@ -424,6 +539,13 @@ Then delete `.healthcheck/tmp/security-*.md` and `.healthcheck/tmp/entry-points.
 | Unencrypted storage | `encrypted = false` | major |
 | Tauri broad allowlist / Electron nodeIntegration | Desktop sandbox escape | major–critical |
 | Flutter/Swift secret in storage / TLS disabled | Mobile data exposure | major–critical |
+| macOS XPC listener accepts any / PID-checked client | Helper callable by any local process | major (critical as root) |
+| macOS root helper acts on a user-writable path by path | Symlink/hardlink/TOCTOU → root | critical |
+| macOS localhost server: all-interface bind, no Host/Origin check | DNS rebinding / browser CSRF | minor–major |
+| macOS URL scheme acts without confirmation | Any web page drives the app | major |
+| macOS update/install without Team-ID signature check | Network → code execution | major–critical |
+| macOS injection entitlements / no hardened runtime | TCC and helper-trust inheritance | major–critical |
+| macOS root process runs user-writable binary / passes DYLD_* | User → root | major–critical |
 | Prompt/tool injection into exec | LLM agent RCE path | major–critical |
 | Pipe-to-shell installer / lifecycle RCE | Supply-chain trust | major |
 

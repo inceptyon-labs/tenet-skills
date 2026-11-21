@@ -538,6 +538,62 @@ falsely high because the generic web checks find nothing.
 - **Description:** Secrets/tokens stored in non-secure stores instead of Keychain/`flutter_secure_storage`, cleartext `http://` to app APIs, disabled TLS validation, or ATS `NSAllowsArbitraryLoads`.
 - **Detection:** Flutter `.dart` and iOS `.swift`/`Info.plist` playbook greps in the skill.
 
+### SEC-MACOS-001: XPC / Privileged Helper Client Not Validated
+
+- **Severity:** critical (root listener accepts unvalidated peers, or a root helper method acts on a client-supplied path/command with no allowlist enforced in the helper), major (non-root listener, PID-based check, requirement without Team ID, `AuthorizationExecuteWithPrivileges`)
+- **Confidence:** native (read `shouldAcceptNewConnection` and every exported method)
+- **Description:** Any local process can connect to the helper and call its methods, or the peer check can be raced or satisfied by another developer's binary.
+- **Detection:** macOS playbook item 1.
+- **Do NOT flag:** `setCodeSigningRequirement`/`setConnectionCodeSigningRequirement` (or an audit-token `SecCodeCopyGuestWithAttributes` check) with a requirement pinning identifier and Team ID.
+
+### SEC-MACOS-002: Privileged Filesystem Operation Follows Links or Races
+
+- **Severity:** critical
+- **Confidence:** native (trace from the exported method to the syscall)
+- **Description:** Code running as root acts by path on an entry under a user-writable directory, so a planted symlink, hardlink, or check-then-use swap redirects the delete, move, or chown onto a system file. Hardlinks pass symlink-only guards, and an ownership transfer on a shared inode hands the user the system file.
+- **Detection:** macOS playbook item 2.
+- **Do NOT flag:** `lstat` + `st_nlink == 1` check, `O_NOFOLLOW` component walk, descriptor-relative `unlinkat`/`renameatx_np`/`fchown`, no ownership transfer of root-owned inodes; or the same operations in a process running as the user.
+
+### SEC-MACOS-003: Localhost Server Reachable from Web Pages or the Network
+
+- **Severity:** major (all-interface bind for a local-only server; no `Host` allowlist or no `Origin` check on a state-changing endpoint), minor (no `Host` allowlist, read-only endpoints)
+- **Confidence:** native
+- **Description:** A browser page can reach `127.0.0.1` through DNS rebinding or simple cross-origin requests, or the listener is exposed on the LAN.
+- **Detection:** macOS playbook item 3.
+- **Do NOT flag above `info`:** a loopback-bound server with a `Host` allowlist and `Origin` check but no bearer token.
+
+### SEC-MACOS-004: URL Scheme or Apple Event Handler Acts Without Confirmation
+
+- **Severity:** major
+- **Confidence:** native
+- **Description:** Any web page can open `scheme://…`; a handler that deletes, moves, runs, installs, or opens a URL-supplied path without user confirmation lets the page drive the app. `NSAppleScript(source:)` built from outside input is script injection.
+- **Detection:** macOS playbook item 4.
+- **Do NOT flag:** handlers that only navigate to a screen or tab.
+
+### SEC-MACOS-005: Update or Download Installed Without Signature Verification
+
+- **Severity:** major (Sparkle feed over HTTP or missing `SUPublicEDKey`; custom installer without a Team-ID-pinned signature check), critical (HTTP feed and no EdDSA key, or an unverified install running as root / via `installer -pkg`)
+- **Confidence:** native or heuristic
+- **Description:** An attacker on the network or controlling the download host can get arbitrary code installed.
+- **Detection:** macOS playbook item 5.
+- **Do NOT flag:** Sparkle 2 with HTTPS feed and `SUPublicEDKey`; installs verified with `SecStaticCodeCheckValidity` against a requirement pinning the expected Team ID.
+
+### SEC-MACOS-006: Hardened Runtime Weakened by Entitlements or Signing
+
+- **Severity:** major (`disable-library-validation`, `allow-dyld-environment-variables`, or `get-task-allow` in release; release signing without `--options runtime`), critical (any of these on an app a root helper trusts by code signature)
+- **Confidence:** heuristic
+- **Description:** Injected code inherits the app's TCC grants and passes any helper's code-signing requirement for the app.
+- **Detection:** macOS playbook item 6.
+- **Do NOT flag:** debug-only entitlement files and dev-only signing scripts.
+
+### SEC-MACOS-007: Privileged Process Runs an Untrusted Binary or Leaks Its Environment
+
+- **Severity:** critical (root executes a binary at a user-writable path or via `PATH`), major (root passes `DYLD_*`/`PATH` from its environment to children)
+- **Confidence:** native
+- **Description:** A same-user attacker swaps the binary or injects a library and gets it run as root.
+- **Detection:** macOS playbook item 7.
+- **Do NOT flag:** a user-context app running user-installed tools with argv arrays (no boundary crossed).
+
 ### SEC-LLM-001: Prompt / Tool Injection into Execution
 
 - **Severity:** major (critical when the injected instruction can drive tool execution or code exec)

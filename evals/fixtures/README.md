@@ -10,12 +10,14 @@ flagged. The ground truth lives in `security-recall/EXPECTED.json`.
 
 ## What it measures
 
-- **Recall** — of the 20 planted vulnerabilities across 12 classes (injection, access control,
+- **Recall** — of the 23 planted vulnerabilities across 12 classes (injection, access control,
   auth, crypto, SSRF, validation, config, deserialization, parsing, platform), how many did the
   skill catch at the expected severity?
-- **Precision** — of the 9 safe decoys (parameterized queries, Drizzle `sql` tagged templates,
+- **Precision** — of the 12 safe decoys (parameterized queries, Drizzle `sql` tagged templates,
   DOMPurify-wrapped HTML, `execFile` array form, `Math.random` jitter, sha1 cache key,
-  ownership-scoped query, publishable Stripe key, allowlisted SSRF), how many did it wrongly
+  ownership-scoped query, publishable Stripe key, allowlisted SSRF, XPC listener with a Team-ID
+  code-signing requirement, Host-checked loopback server without a token, same-user
+  subprocess), how many did it wrongly
   flag? Each decoy targets a specific false-positive trap from `shared/security-calibration.md`.
 
 ## How to run

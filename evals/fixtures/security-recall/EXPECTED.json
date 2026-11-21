@@ -23,7 +23,10 @@
     { "id": "P17", "rule": "SEC-PARSE-002",  "file": "src/util/unzip.ts",        "class": "parsing",         "min_severity": "major" },
     { "id": "P18", "rule": "SEC-DEFAULT-002","file": "config/prod.ts",           "class": "config",          "min_severity": "critical" },
     { "id": "P19", "rule": "SEC-DESER-002",  "file": "scripts/load_config.py",   "class": "deserialization", "min_severity": "major" },
-    { "id": "P20", "rule": "SEC-MOBILE-001", "file": "ios/Session.swift",        "class": "platform",        "min_severity": "major" }
+    { "id": "P20", "rule": "SEC-MOBILE-001", "file": "ios/Session.swift",        "class": "platform",        "min_severity": "major" },
+    { "id": "P21", "rule": "SEC-MACOS-001",  "file": "macos/PrivilegedHelper/HelperListener.swift", "class": "platform", "min_severity": "critical" },
+    { "id": "P22", "rule": "SEC-MACOS-002",  "file": "macos/PrivilegedHelper/TrashService.swift",   "class": "platform", "min_severity": "critical" },
+    { "id": "P23", "rule": "SEC-MACOS-003",  "file": "macos/App/LocalAPIServer.swift",              "class": "platform", "min_severity": "major" }
   ],
   "decoys": [
     { "id": "D1", "file": "src/db/accounts.ts",        "label": "parameterized-query",   "allowed_max_severity": null },
@@ -34,6 +37,9 @@
     { "id": "D6", "file": "src/util/cache.ts",          "label": "sha1-cachekey",         "allowed_max_severity": "info" },
     { "id": "D7", "file": "src/api/invoices.ts",        "label": "scoped-query",          "allowed_max_severity": null },
     { "id": "D8", "file": "src/config/stripe.ts",       "label": "publishable-key",       "allowed_max_severity": "minor", "dimension": "secrets" },
-    { "id": "D9", "file": "src/api/fetchWhitelisted.ts","label": "ssrf-allowlisted",      "allowed_max_severity": null }
+    { "id": "D9", "file": "src/api/fetchWhitelisted.ts","label": "ssrf-allowlisted",      "allowed_max_severity": null },
+    { "id": "D10", "file": "macos/SecureHelper/SecureListener.swift", "label": "xpc-codesign-requirement",       "allowed_max_severity": null },
+    { "id": "D11", "file": "macos/App/StatusServer.swift",            "label": "loopback-host-checked-no-token", "allowed_max_severity": "info" },
+    { "id": "D12", "file": "macos/App/ToolRunner.swift",              "label": "same-user-subprocess",           "allowed_max_severity": null }
   ]
 }
